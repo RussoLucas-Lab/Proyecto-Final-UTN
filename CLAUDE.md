@@ -28,7 +28,11 @@ Plataforma de gestión jurídica para un estudio de las áreas **Laboral** y **A
 
 ## Stack
 
-React · FastAPI · PostgreSQL · n8n · Docker · Cloudflare R2 (documentos) · OpenAI (solo dentro de n8n).
+React · FastAPI · PostgreSQL · n8n · Docker · Cloudflare R2 (documentos) · OpenAI (solo dentro de n8n). 
+
+## Instalador de paquetes
+
+Utiliza solamente pnpm para instalar librerías, paquetes y dependencias
 
 ## Alcance
 
