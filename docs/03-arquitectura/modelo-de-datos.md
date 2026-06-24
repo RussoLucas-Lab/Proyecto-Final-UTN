@@ -12,9 +12,9 @@ El estado de un caso **no** es un enum fijo. Cada área (Laboral, ART) tiene su 
 |---------|-------------|
 | `usuario` | Personal del estudio (todos abogados). Roles SOCIO / ABOGADO. |
 | `refresh_token` | Control de sesiones para revocación de refresh tokens (seguridad). |
-| `cliente` | Persona representada. Datos de la persona del formulario de admisión (nombre, DNI, CUIL, domicilio). |
+| `cliente` | Persona representada. Datos de la persona del formulario de admisión (nombre, DNI, CUIL, domicilio con CP/Localidad/Provincia). |
 | `caso` | Expediente. Tiene área, etapa actual, cliente y abogado responsable; en ART, tipo de reclamo. |
-| `ficha_laboral` | Datos del trabajo y registración (admisión). 1:1 con el caso. |
+| `ficha_laboral` | Datos del trabajo y registración (admisión), incluido el domicilio laboral (con CP/Localidad/Provincia) y el ramo de actividad — ambos necesarios para el telegrama (Ley 23.789). 1:1 con el caso. |
 | `etapa` | Catálogo configurable de etapas por área y fase (extrajudicial/judicial), con orden y `es_terminal`. |
 | `transicion_etapa` | Transiciones permitidas entre etapas (grafo del flujo). |
 | `historial_caso` | Bitácora **inmutable** de avances/retrocesos de etapa. |

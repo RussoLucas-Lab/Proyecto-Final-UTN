@@ -1,0 +1,43 @@
+# ── Virtual environment ────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Env & secrets ──────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python bytecode ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# ── Distribution / packaging ───────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ── Test & coverage ────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# ── Linters & type checkers ────────────────────────────────────
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+
+# ── Alembic (versiones se commitean; no ignorar migrations/) ───
+alembic/versions/*.pyc
+
+# ── Logs ───────────────────────────────────────────────────────
+*.log
+
+# ── OS ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

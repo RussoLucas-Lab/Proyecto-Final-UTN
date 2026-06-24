@@ -37,23 +37,40 @@ Abogado (cualquier rol con acceso al caso Laboral).
 
 ## Campos del formulario (oficial Ley 23.789)
 
-Se agrupan en tres bloques. El mapeo indica de dónde se prellena cada campo.
+El prototipo usa un **PDF rellenable real** (`pdf-lib`, `form.getTextField(name)` / `form.getRadioGroup(name)`). Los nombres de campo de la tabla son **exactos**, tal como están definidos en el PDF oficial — deben usarse literalmente al llamar `getTextField()`, no son una convención propia.
 
-| Bloque | Campo | Origen (prellenado) |
-|--------|-------|---------------------|
-| General | Tipo de comunicación | Fijo / seleccionable |
-| Destinatario (empleador) | Apellido y nombre o razón social | `ficha_laboral.razon_social` / `empleador_nombre` |
-| Destinatario | Ramo o actividad principal | `ficha_laboral` (capturar en admisión) |
-| Destinatario | Domicilio laboral | `ficha_laboral.direccion_trabajo` |
-| Destinatario | Código Postal · Localidad · Provincia | `ficha_laboral` (domicilio laboral) |
-| Remitente (trabajador) | Apellido y nombre | `cliente.nombre` |
-| Remitente | DNI N.° | `cliente.dni` |
-| Remitente | Fecha | Fecha de generación |
-| Remitente | Domicilio real | `cliente.domicilio_real` |
-| Remitente | Código Postal · Localidad · Provincia | `cliente` (domicilio real) |
-| Texto | Mensaje | `telegrama.cuerpo` (editable; según número de telegrama) |
+| Bloque | Campo del PDF (nombre exacto) | Origen (prellenado) |
+|--------|-------------------------------|---------------------|
+| Destinatario (empleador) | `Apellido y nombre o razón social` | `ficha_laboral.razon_social` / `empleador_nombre` |
+| Destinatario | `Ramo o actividad principal` | `ficha_laboral.ramo_actividad` |
+| Destinatario | `Domicilio laboral` | `ficha_laboral.direccion_trabajo` |
+| Destinatario | `CP` | `ficha_laboral.direccion_trabajo_cp` |
+| Destinatario | `Localidad` | `ficha_laboral.direccion_trabajo_localidad` |
+| Destinatario | `Provincia` | `ficha_laboral.direccion_trabajo_provincia` |
+| Remitente (trabajador) | `Apellido y nombre REMITENTE` | `cliente.nombre` |
+| Remitente | `N° DNI REMITENTE` | `cliente.dni` |
+| Remitente | `Fecha` | Fecha de generación |
+| Remitente | `Domicilio real` | `cliente.domicilio_real` |
+| Remitente | `CP REMITENTE` | `cliente.domicilio_real_cp` |
+| Remitente | `Localidad REMITENTE` | `cliente.domicilio_real_localidad` |
+| Remitente | `Provincia REMITENTE` | `cliente.domicilio_real_provincia` |
+| Texto | `Campo de texto` | `telegrama.cuerpo` (editable) |
 
-> Nota de modelo: algunos campos (ramo/actividad, y el desglose de CP/Localidad/Provincia) no están aún en el modelo. Capturarlos en el formulario de admisión (`ficha_laboral`) o como campos del propio `telegrama`. Decisión menor a confirmar al implementar.
+### Tipo de comunicación (radio group del PDF)
+
+El PDF tiene un **grupo de radio buttons** llamado `Opciones de comunicación` con 3 valores fijos del formulario oficial:
+
+| Valor del radio | Etiqueta del formulario | Uso en Iuris |
+|------------------|--------------------------|--------------|
+| `Opción1` | Comunicación de renuncia | No aplica al caso de uso actual |
+| `Opción2` | Comunicación de ausencia | No aplica al caso de uso actual |
+| `Opción3` | Otro tipo de comunicación | **Selección por defecto** — es la que corresponde a la intimación laboral del estudio |
+
+Se selecciona con `form.getRadioGroup('Opciones de comunicación').select('Opción3')`. Se modela en el dominio como `telegrama.tipo_comunicacion` (enum `RENUNCIA` / `AUSENCIA` / `OTRO`, default `OTRO`), por si el estudio llegara a necesitar las otras opciones a futuro.
+
+### Validación de extensión del mensaje
+
+Este formato específico del PDF está pensado para mensajes de **más de 30 palabras**; el prototipo muestra un aviso ("este formato es para más de 30") cuando el texto es más corto. El frontend debe replicar esa validación (advertencia, no bloqueo) sobre `Campo de texto` / `telegrama.cuerpo`.
 
 ## Reglas de negocio
 
@@ -82,8 +99,22 @@ Se agrupan en tres bloques. El mapeo indica de dónde se prellena cada campo.
 
 ## Arquitectura / implementación
 
-- **Determinístico, sin IA, sin n8n.** Llenado de formulario en el **frontend** con `pdf-lib`, sobre el PDF del formulario oficial (incluido como recurso de la app).
+- **Determinístico, sin IA, sin n8n.** Llenado de formulario en el **frontend** con `pdf-lib`, sobre el PDF rellenable oficial (incluido como recurso de la app, embebido o cargado por fetch).
 - Prellenado desde la API (`GET /casos/{id}` + `ficha_laboral`).
+- Implementación (referencia del prototipo validado):
+  ```js
+  const { PDFDocument } = PDFLib;
+  const doc = await PDFDocument.load(PDF_BYTES);
+  const form = doc.getForm();
+  // Texto: un getTextField().setText() por cada campo de la tabla anterior,
+  // usando el nombre EXACTO del PDF (no traducir ni normalizar el nombre).
+  form.getTextField('Apellido y nombre o razón social').setText(empleador.razonSocial);
+  // ... resto de los campos de texto ...
+  // Radio: una sola selección del grupo "Opciones de comunicación"
+  form.getRadioGroup('Opciones de comunicación').select('Opción3'); // default: OTRO
+  const bytes = await doc.save();
+  ```
+- Manejar con `try/catch` por campo (`form.getTextField(name)` puede lanzar si el nombre no existe en esa versión del PDF); registrar en consola los campos no encontrados sin interrumpir la generación.
 - El PDF resultante puede subirse a R2 con el flujo estándar de documentos (URL prefirmada) y registrarse vía `POST /casos/{id}/documentos` + creación del `telegrama`.
 
 ## Criterios de aceptación
