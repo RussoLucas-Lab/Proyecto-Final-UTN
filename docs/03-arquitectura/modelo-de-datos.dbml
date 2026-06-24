@@ -1,0 +1,356 @@
+// =====================================================================
+// Iuris — Esquema de base de datos (DBML) — v2 (post-relevamiento)
+// Pegar en https://dbdiagram.io para visualizar el diagrama.
+// Reemplaza a la v1. Refleja los hallazgos del INFORME_RELEVAMIENTO.md.
+//
+// CAMBIO CLAVE: los estados del caso ya NO son un enum fijo. Son DATOS
+// configurables (tablas `etapa` + `transicion_etapa`), porque cada área
+// (Laboral / ART) tiene su propio ciclo de vida con muchas etapas.
+// =====================================================================
+
+Project Iuris {
+  database_type: 'PostgreSQL'
+  Note: 'Gestión jurídica para estudio de áreas Laboral y ART. Estados del caso modelados como datos.'
+}
+
+// ----------------------------- Enums -----------------------------
+
+Enum rol_usuario {
+  SOCIO     // acceso total + gestión de usuarios (es el "admin")
+  ABOGADO   // operación completa salvo gestión de usuarios (incluye administrativos)
+}
+
+Enum area_derecho {
+  LABORAL
+  ART
+  // TRANSITO  // fuera de alcance del MVP (posible trabajo futuro)
+}
+
+Enum fase_caso {
+  EXTRAJUDICIAL
+  JUDICIAL
+}
+
+Enum tipo_reclamo_art {
+  ACCIDENTE
+  ENFERMEDAD
+}
+
+Enum resultado_telegrama {
+  PENDIENTE
+  ENTREGADO
+  RECHAZADO
+  EN_SUCURSAL
+  DOMICILIO_INEXISTENTE
+  CERRADO
+}
+
+Enum categoria_documento {
+  DNI
+  BONO_SUELDO
+  HISTORIA_CLINICA
+  ACTA_NOTARIAL
+  PODER
+  OTRO
+}
+
+Enum formato_documento {
+  PDF
+  DOC
+  IMAGEN
+}
+
+Enum tipo_comunicacion {
+  ACTUALIZACION_AUTOMATICA  // batch generado cada 15 días
+  MANUAL
+}
+
+Enum estado_comunicacion {
+  PENDIENTE_REVISION
+  APROBADO
+  DESCARTADO
+}
+
+Enum tipo_backup {
+  AUTOMATICO
+  MANUAL
+}
+
+Enum estado_backup {
+  OK
+  ERROR
+}
+
+// ----------------------------- Acceso ----------------------------
+
+Table usuario {
+  id            integer       [pk, increment]
+  email         varchar(120)  [unique, not null]
+  password_hash varchar(255)  [not null, note: 'Hash, nunca texto plano']
+  nombre        varchar(120)  [not null]
+  rol           rol_usuario   [not null]
+  area          area_derecho  [note: 'Área del profesional. NULL para socios (transversales)']
+  matricula     varchar(50)
+  activo        boolean       [not null, default: true]
+  creado_en     timestamp     [not null, default: `now()`]
+
+  Note: 'Todo el personal es abogado. Roles SOCIO / ABOGADO. (Relevamiento §4)'
+}
+
+// ---------------------------- Clientes ---------------------------
+
+Table cliente {
+  id                   integer       [pk, increment]
+  nombre               varchar(120)  [not null]
+  dni                  varchar(20)   [unique, not null, note: 'Único en el estudio (RN-03)']
+  cuil                 varchar(20)
+  telefono             varchar(30)
+  email                varchar(120)
+  domicilio_real       varchar(255)
+  domicilio_coincide_dni boolean
+  creado_en            timestamp     [not null, default: `now()`]
+
+  Note: 'Datos de la persona (parte del formulario de admisión).'
+}
+
+// ------------------------------ Casos ----------------------------
+
+Table caso {
+  id                     integer          [pk, increment]
+  cliente_id             integer          [not null, note: 'Un caso -> 1 cliente']
+  abogado_responsable_id integer          [not null, note: 'Usuario responsable del caso']
+  area                   area_derecho     [not null]
+  tipo_reclamo           tipo_reclamo_art [note: 'Solo ART: accidente o enfermedad. NULL en Laboral']
+  codigo_expediente      varchar(50)      [note: 'Otorgado por IOL (Iurix-IOL)']
+  etapa_actual_id        integer          [not null, note: 'Estado actual = etapa (datos, no enum)']
+  fecha_inicio           date             [note: 'Toma del cliente / firma de cuota litis']
+  observaciones          text
+  creado_en              timestamp        [not null, default: `now()`]
+
+  Indexes {
+    area
+    abogado_responsable_id
+    cliente_id
+    etapa_actual_id
+    codigo_expediente
+  }
+  Note: 'Núcleo del sistema. El avance entre etapas es manual (RN). (Relevamiento §3)'
+}
+
+// Ficha de admisión laboral (datos del trabajo y registración). 1:1 con el caso.
+Table ficha_laboral {
+  id                    integer      [pk, increment]
+  caso_id               integer      [unique, not null]
+  empleador_nombre      varchar(160)
+  direccion_trabajo     varchar(255)
+  razon_social          varchar(160)
+  motivo_cese           varchar(255)
+  fecha_inicio_laboral  date
+  jornada               varchar(120)
+  tareas                text
+  remuneracion          numeric(14,2)
+  cct_aplicable         varchar(120) [note: 'Convenio Colectivo de Trabajo']
+  // Si el trabajador está registrado:
+  registrado            boolean
+  fecha_alta            date
+  sueldo_coincide_bono  boolean
+  jornada_coincide_bono boolean
+  estado_aportes        varchar(255)
+  // Siniestralidad:
+  accidentes            text         [note: 'Detalle de accidentes (si hay)']
+  enfermedades          text         [note: 'Enfermedades profesionales (si hay)']
+  notas                 text
+
+  Note: 'Estructura del formulario de admisión. (Relevamiento §12)'
+}
+
+// ----------------- Ciclo de vida (estados como datos) ------------
+
+Table etapa {
+  id          integer      [pk, increment]
+  area        area_derecho [not null]
+  fase        fase_caso    [not null]
+  nombre      varchar(80)  [not null, note: 'p.ej. Telegrama 1, Conciliación, Sentencia']
+  orden       integer      [not null, note: 'Orden dentro del flujo del área']
+  es_terminal boolean      [not null, default: false, note: 'Acuerdo / Indemnización / Sentencia']
+
+  Indexes {
+    (area, orden)
+    (area, nombre) [unique]
+  }
+  Note: 'Catálogo configurable de etapas por área. Reemplaza al enum estado_caso.'
+}
+
+Table transicion_etapa {
+  id              integer [pk, increment]
+  etapa_origen_id integer [not null]
+  etapa_destino_id integer [not null]
+
+  Indexes {
+    (etapa_origen_id, etapa_destino_id) [unique]
+  }
+  Note: 'Transiciones permitidas entre etapas (grafo del flujo). El retroceso se habilita con confirmación a nivel app.'
+}
+
+Table historial_caso {
+  id               integer      [pk, increment]
+  caso_id          integer      [not null]
+  etapa_anterior_id integer     [note: 'NULL en la creación del caso']
+  etapa_nueva_id   integer      [not null]
+  evento           varchar(255) [not null, note: 'p.ej. avance / retroceso de etapa']
+  autor_id         integer      [not null]
+  ocurrido_en      timestamp    [not null, default: `now()`]
+
+  Indexes {
+    caso_id
+  }
+  Note: 'Registro INMUTABLE de movimientos. No se edita ni se elimina (RN-05, RN-06).'
+}
+
+// ---------------------------- Telegramas -------------------------
+
+Table telegrama {
+  id                integer             [pk, increment]
+  caso_id           integer             [not null]
+  numero            integer             [not null, note: '1, 2 o 3']
+  resultado         resultado_telegrama [not null, default: 'PENDIENTE']
+  destinatario      varchar(160)        [note: 'Empleador']
+  domicilio_destino varchar(255)
+  cuerpo            text                [note: 'Texto del reclamo (para generar el PDF Ley 23.789)']
+  codigo_seguimiento varchar(60)        [note: 'Código que entrega el correo']
+  fecha_envio       date
+  fecha_resultado   date
+
+  Indexes {
+    (caso_id, numero) [unique]
+  }
+  Note: 'Telegramas del flujo Laboral (Ley 23.789). Hasta 3 por caso. (Relevamiento §3.1, §12)'
+}
+
+// ---------------------------- Documentos -------------------------
+
+Table documento {
+  id                  integer             [pk, increment]
+  caso_id             integer             [not null, note: 'Siempre asociado a un caso (RN-02)']
+  categoria           categoria_documento [not null]
+  formato             formato_documento   [not null]
+  nombre_archivo      varchar(255)        [not null, note: 'Convención: categoria_Apellido_Nombre']
+  ruta_almacenamiento varchar(500)        [not null]
+  subido_por          integer             [not null, note: 'Solo un usuario/abogado sube documentos']
+  subido_en           timestamp           [not null, default: `now()`]
+
+  Note: 'El cliente NUNCA sube documentos; lo hace el abogado. (Relevamiento §6)'
+}
+
+// ------------------------ Agenda / Vencimientos ------------------
+
+Table vencimiento {
+  id          integer       [pk, increment]
+  caso_id     integer       [not null]
+  descripcion varchar(255)  [not null, note: 'p.ej. Presentar demanda']
+  fecha       date          [not null]
+  completado  boolean       [not null, default: false]
+  creado_por  integer
+  creado_en   timestamp     [not null, default: `now()`]
+
+  Indexes {
+    fecha
+  }
+  Note: 'Movimientos a realizar (vista calendario). Visibles para todo el estudio, sin notificaciones. (Relevamiento §8)'
+}
+
+// --------------------- Comunicaciones (IA asistencial) -----------
+
+Table comunicacion {
+  id           integer            [pk, increment]
+  caso_id      integer            [not null]
+  contenido    text               [not null, note: 'Borrador generado por la IA (n8n)']
+  tipo         tipo_comunicacion  [not null]
+  estado       estado_comunicacion [not null, default: 'PENDIENTE_REVISION']
+  generado_en  timestamp          [not null, default: `now()`]
+  aprobado_por integer            [note: 'Usuario que revisó/aprobó. El envío por WhatsApp es manual']
+  aprobado_en  timestamp
+
+  Indexes {
+    caso_id
+    estado
+  }
+  Note: 'Borradores de actualización. Batch automático cada 15 días + manuales. Siempre revisión humana (RN-10). (Relevamiento §5)'
+}
+
+// ------------------------------ Backup ---------------------------
+
+Table refresh_token {
+  id         integer   [pk, increment]
+  usuario_id integer   [not null]
+  token      varchar(255) [unique, not null, note: 'Hash del refresh token']
+  issued_at  timestamp [not null, default: `now()`]
+  expires_at timestamp [not null]
+  revoked    boolean   [not null, default: false]
+
+  Indexes {
+    usuario_id
+  }
+  Note: 'Control de sesiones para revocación de refresh tokens (seguridad §3-4).'
+}
+
+Table backup {
+  id        integer       [pk, increment]
+  fecha     timestamp     [not null, default: `now()`]
+  tipo      tipo_backup   [not null]
+  estado    estado_backup [not null]
+  ubicacion varchar(500)
+
+  Note: 'Historial de respaldos. Ejecutado por n8n (WF-02). (Relevamiento §9)'
+}
+
+// ---------------------------- Relaciones -------------------------
+
+Ref: caso.cliente_id > cliente.id
+Ref: caso.abogado_responsable_id > usuario.id
+Ref: caso.etapa_actual_id > etapa.id
+Ref: ficha_laboral.caso_id - caso.id                 // 1:1
+Ref: transicion_etapa.etapa_origen_id > etapa.id
+Ref: transicion_etapa.etapa_destino_id > etapa.id
+Ref: historial_caso.caso_id > caso.id
+Ref: historial_caso.etapa_anterior_id > etapa.id
+Ref: historial_caso.etapa_nueva_id > etapa.id
+Ref: historial_caso.autor_id > usuario.id
+Ref: telegrama.caso_id > caso.id
+Ref: documento.caso_id > caso.id
+Ref: documento.subido_por > usuario.id
+Ref: vencimiento.caso_id > caso.id
+Ref: vencimiento.creado_por > usuario.id
+Ref: comunicacion.caso_id > caso.id
+Ref: comunicacion.aprobado_por > usuario.id
+Ref: refresh_token.usuario_id > usuario.id
+
+// --------------------------- Agrupación --------------------------
+
+TableGroup acceso {
+  usuario
+  refresh_token
+}
+
+TableGroup nucleo {
+  cliente
+  caso
+  ficha_laboral
+}
+
+TableGroup ciclo_de_vida {
+  etapa
+  transicion_etapa
+  historial_caso
+}
+
+TableGroup operatoria {
+  telegrama
+  documento
+  vencimiento
+  comunicacion
+}
+
+TableGroup infraestructura {
+  backup
+}
