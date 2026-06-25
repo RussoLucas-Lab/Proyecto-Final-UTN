@@ -1,61 +1,206 @@
-# Modelo de Datos — Guía de Relaciones
+<div align="center">
 
-Esta guía explica el modelo de datos de Iuris para que pueda entenderse y mantenerse sin leer el DDL completo. La **fuente de verdad** del esquema es [`modelo-de-datos.dbml`](./modelo-de-datos.dbml) (visualizable en dbdiagram.io); este documento explica qué significa cada relación y qué reglas deben respetarse al implementar.
+# ⚖️ IURIS
 
-> Contexto del dominio en `../../INFORME_RELEVAMIENTO.md`. Reglas de negocio en `../01-requisitos/reglas-de-negocio.md`.
+### Sistema de Gestión Jurídica para Estudios Laborales y ART
 
-## Principios de diseño (leer antes de tocar el modelo)
+*Plataforma de gestión integral de expedientes jurídicos con generación asistida de comunicaciones mediante inteligencia artificial bajo supervisión humana.*
 
-1. **Los estados del caso son datos, no un enum.** Cada área (Laboral, ART) tiene su propio ciclo de vida con muchas etapas. Por eso el estado se modela con las tablas `etapa` (catálogo) y `transicion_etapa` (transiciones permitidas), y el caso apunta a su `etapa_actual_id`. Agregar o cambiar etapas es **cargar datos**, no modificar código.
-2. **El historial es inmutable.** `historial_caso` solo admite inserciones; nunca se actualiza ni se borra (RN-05, RN-06).
-3. **La IA solo produce borradores.** `comunicacion` guarda borradores que un humano revisa y aprueba; el envío (por WhatsApp) es externo y manual (RN-10).
-4. **Los documentos los sube el abogado.** `documento.subido_por` siempre referencia a un `usuario`; el cliente nunca carga archivos.
+[![Metodología](https://img.shields.io/badge/Metodología-SDD%20%2B%20Ágil-blue)]()
+[![Backend](https://img.shields.io/badge/Backend-FastAPI-009688)]()
+[![Frontend](https://img.shields.io/badge/Frontend-React-61DAFB)]()
+[![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-336791)]()
+[![Orquestación](https://img.shields.io/badge/IA-n8n%20%2B%20OpenAI-EA4B71)]()
+[![Deploy](https://img.shields.io/badge/Deploy-Docker-2496ED)]()
 
-## Entidades
+**Universidad Tecnológica Nacional — Facultad Regional Mendoza**
 
-| Tabla | Rol en el sistema |
-|-------|-------------------|
-| `usuario` | Personal del estudio (todos abogados). Roles SOCIO / ABOGADO. |
-| `cliente` | Persona representada. Incluye datos de la persona del formulario de admisión. |
-| `caso` | Expediente. Núcleo del sistema; apunta a su etapa actual. |
-| `ficha_laboral` | Datos del trabajo y registración (resto del formulario de admisión). 1:1 con el caso. |
-| `etapa` | Catálogo configurable de etapas por área y fase. |
-| `transicion_etapa` | Transiciones permitidas entre etapas (el grafo del flujo). |
-| `historial_caso` | Bitácora inmutable de avances/retrocesos de etapa. |
-| `telegrama` | Telegramas del flujo Laboral (Ley 23.789), hasta 3 por caso, con su resultado de entrega. |
-| `documento` | Archivos del caso (categoría + formato). |
-| `vencimiento` | Ítems de agenda / movimientos a realizar (vista calendario). |
-| `comunicacion` | Borradores de mensajes al cliente (batch IA + manuales). |
-| `backup` | Historial de respaldos (los ejecuta n8n). Tabla independiente, sin relaciones. |
+**Tecnicatura Universitaria en Programación · Proyecto Final · Comisión 3**
 
-## Relaciones (cardinalidad y significado)
+</div>
 
-Notación: `A → B` significa que la clave foránea vive en A y apunta a B.
+---
 
-| Relación (FK) | Cardinalidad | Significado |
-|---------------|--------------|-------------|
-| `caso.cliente_id → cliente.id` | N:1 | Un cliente puede tener muchos casos; cada caso pertenece a un solo cliente. |
-| `caso.abogado_responsable_id → usuario.id` | N:1 | Cada caso tiene un abogado responsable; un abogado lleva muchos casos. (Todos pueden *leer* todos los casos; esta FK indica titularidad, no visibilidad.) |
-| `caso.etapa_actual_id → etapa.id` | N:1 | Cada caso está parado en una etapa; una etapa puede ser la actual de muchos casos. |
-| `ficha_laboral.caso_id → caso.id` | 1:1 | Cada caso tiene a lo sumo una ficha de admisión (`caso_id` es único). |
-| `transicion_etapa.etapa_origen_id → etapa.id` | N:1 | Auto-relación de `etapa`: define desde qué etapa se puede salir. |
-| `transicion_etapa.etapa_destino_id → etapa.id` | N:1 | …y hacia qué etapa se puede ir. Juntas forman un grafo N:M sobre `etapa`. |
-| `historial_caso.caso_id → caso.id` | N:1 | Un caso acumula muchas entradas de historial. |
-| `historial_caso.etapa_anterior_id → etapa.id` | N:1 | Etapa de la que se venía (NULL al crear el caso). |
-| `historial_caso.etapa_nueva_id → etapa.id` | N:1 | Etapa a la que se pasó. |
-| `historial_caso.autor_id → usuario.id` | N:1 | Quién registró el movimiento. |
-| `telegrama.caso_id → caso.id` | N:1 | Un caso Laboral tiene hasta 3 telegramas (único `caso_id + numero`). |
-| `documento.caso_id → caso.id` | N:1 | Un caso contiene muchos documentos. |
-| `documento.subido_por → usuario.id` | N:1 | Quién subió el archivo (siempre un abogado). |
-| `vencimiento.caso_id → caso.id` | N:1 | Un caso puede tener muchos vencimientos/ítems de agenda. |
-| `vencimiento.creado_por → usuario.id` | N:1 | Quién creó el ítem (opcional). |
-| `comunicacion.caso_id → caso.id` | N:1 | Un caso acumula muchos borradores de comunicación. |
-| `comunicacion.aprobado_por → usuario.id` | N:1 | Quién aprobó el borrador (NULL mientras está pendiente). |
-| `refresh_token.usuario_id → usuario.id` | N:1 | Sesiones (refresh tokens) de un usuario, para revocación. |
+## 📑 Índice
 
-`usuario` 1:1 conceptual con el perfil profesional (se fusionaron en una sola tabla porque todo el personal es abogado).
+1. [Resumen](#-resumen)
+2. [Contexto y motivación](#-contexto-y-motivación)
+3. [Objetivos](#-objetivos)
+4. [Alcance](#-alcance)
+5. [Arquitectura general](#️-arquitectura-general)
+6. [Stack tecnológico](#-stack-tecnológico)
+7. [Modelo de datos](#-modelo-de-datos)
+8. [Principios de diseño](#️-principios-de-diseño)
+9. [Metodología](#-metodología)
+10. [Decisiones de arquitectura (ADR)](#-decisiones-de-arquitectura-adr)
+11. [Estructura del repositorio](#-estructura-del-repositorio)
+12. [Instalación y ejecución](#️-instalación-y-ejecución)
+13. [Trabajo futuro](#-trabajo-futuro)
+14. [Equipo y contexto académico](#-equipo-y-contexto-académico)
 
-## Diagrama (vista rápida)
+---
+
+## 📄 Resumen
+
+**Iuris** es una plataforma de gestión jurídica desarrollada como Proyecto Final para un estudio de abogados real de la provincia de Mendoza, especializado en derecho **Laboral** y **ART** (accidentes y enfermedades laborales).
+
+El sistema centraliza la administración de expedientes, modela los flujos procesales propios de cada área como datos configurables, y asiste a los profesionales en la redacción de comunicaciones mediante inteligencia artificial. Un principio rige toda la arquitectura: **la IA es asistiva, nunca autónoma**. Ningún mensaje se envía a un cliente de forma automática; el abogado siempre revisa y aprueba los borradores antes de su envío (*human-in-the-loop*).
+
+El proyecto se desarrolló bajo una metodología de **Desarrollo Guiado por Especificaciones (SDD)** con iteración ágil, produciendo en paralelo los artefactos de código y la documentación académica.
+
+---
+
+## 🎯 Contexto y motivación
+
+El estudio jurídico cliente gestionaba sus expedientes de forma dispersa, sin una herramienta que reflejara la complejidad real de los procesos laborales y de ART. A partir de un relevamiento de requerimientos con el cliente, se identificaron dos problemas centrales:
+
+- **Heterogeneidad de los flujos procesales.** Los casos *Laboral* y *ART* siguen recorridos distintos, con fases extrajudiciales y judiciales, múltiples ramificaciones y vencimientos críticos. Un modelo de estados rígido no alcanza para representarlos.
+- **Carga operativa en las comunicaciones.** La redacción de telegramas laborales (Ley 23.789) y de actualizaciones periódicas a los clientes es repetitiva y propensa a errores, pero exige criterio profesional y no puede automatizarse por completo.
+
+Iuris responde a ambos problemas: modela los estados como datos configurables por área y emplea IA para **generar borradores** que el abogado controla y aprueba.
+
+El estudio opera con dos roles internos, ambos ejercidos por abogados:
+
+| Rol | Permisos |
+|-----|----------|
+| **SOCIO** | Acceso total, incluida la gestión de usuarios |
+| **ABOGADO** | Acceso operativo completo |
+
+---
+
+## 🎯 Objetivos
+
+### Objetivo general
+
+Desarrollar una plataforma web que centralice la gestión de expedientes laborales y de ART de un estudio jurídico, incorporando generación asistida de comunicaciones mediante IA bajo supervisión humana.
+
+### Objetivos específicos
+
+- Digitalizar y centralizar la información de clientes, casos y documentación.
+- Modelar flujos procesales **configurables por área legal**, sin necesidad de redesplegar el sistema ante cambios de proceso.
+- Implementar la generación asistida de telegramas (Ley 23.789) y de comunicaciones periódicas con clientes.
+- Garantizar la **trazabilidad e inmutabilidad** del historial de cada expediente.
+- Asegurar que toda comunicación pase por la aprobación de un abogado antes de enviarse.
+- Mantener una gestión documental controlada, con carga exclusiva por usuarios internos del estudio.
+- Aplicar una metodología de especificación previa (SDD) que documente las decisiones técnicas del proyecto.
+
+---
+
+## 🔍 Alcance
+
+### ✅ Incluido en el MVP
+
+- Gestión de usuarios, clientes y casos.
+- Fichas de admisión laboral.
+- Máquina de estados configurable por área (Laboral y ART).
+- Historial inmutable de movimientos.
+- Generación de telegramas laborales (formulario oficial Ley 23.789).
+- Generación asistida de comunicaciones con clientes (revisión humana obligatoria).
+- Gestión documental y control de vencimientos.
+
+### 🚫 Fuera de alcance (a pedido del cliente)
+
+- Módulo de **reportes**.
+- Módulo de **facturación**.
+
+### 🔭 Diferido a trabajo futuro
+
+- **Portal del cliente** para seguimiento del estado de su caso (ver [Trabajo futuro](#-trabajo-futuro)).
+
+---
+
+## 🏗️ Arquitectura general
+
+La arquitectura separa de forma estricta la lógica de negocio de la lógica de IA. Esta separación no es solo una decisión técnica: es la garantía estructural de que la IA permanezca asistiva.
+
+```
+┌─────────────┐      ┌──────────────────┐      ┌─────────────────┐
+│   React     │◄────►│     FastAPI      │◄────►│  PostgreSQL 16  │
+│  (frontend) │ HTTP │   (backend API)  │ SQL  │   (datos)       │
+└─────────────┘      └────────┬─────────┘      └─────────────────┘
+                              │ webhook / tools
+                              ▼
+                     ┌──────────────────┐      ┌─────────────────┐
+                     │       n8n        │─────►│  OpenAI (LLM)   │
+                     │  (AI Agent nodes)│      └─────────────────┘
+                     └────────┬─────────┘
+                              │
+                              ▼
+                     ┌──────────────────┐
+                     │  Cloudflare R2   │
+                     │  (documentos)    │
+                     └──────────────────┘
+```
+
+**Puntos clave del diseño:**
+
+- **Toda la lógica de IA vive exclusivamente en los nodos AI Agent de n8n.** El backend FastAPI no contiene lógica de IA: únicamente dispara webhooks de n8n y expone endpoints de solo lectura que actúan como *tools* del agente.
+- El backend es **stateless** y se apoya en autenticación basada en cookies (JWT *HttpOnly / Secure / SameSite*) con protección CSRF.
+- Los documentos se almacenan en **Cloudflare R2** (elegido por su precio simple y egreso sin costo).
+
+---
+
+## 🧰 Stack tecnológico
+
+| Capa | Tecnología |
+|------|-----------|
+| **Frontend** | React |
+| **Backend** | FastAPI (Python) · Alembic (migraciones) |
+| **Base de datos** | PostgreSQL 16 |
+| **Orquestación IA** | n8n (nodos AI Agent) |
+| **Proveedor LLM** | OpenAI |
+| **Almacenamiento** | Cloudflare R2 |
+| **Generación de PDF** | pdf-lib |
+| **Contenedores** | Docker / Docker Compose |
+
+**Seguridad y calidad:** JWT en cookies, hashing con bcrypt/argon2, *rate limiting*, migraciones versionadas con Alembic y objetivo de **80 % de cobertura de tests**.
+
+---
+
+## 📘 Modelo de datos
+
+El modelo de datos fue diseñado para soportar la gestión integral de expedientes laborales y ART, priorizando:
+
+- Trazabilidad completa de cada caso.
+- Auditabilidad de los cambios realizados.
+- Configuración flexible de procesos jurídicos.
+- Conservación histórica de la información.
+- Separación clara entre reglas de negocio y estructura persistente.
+
+La base de datos constituye el núcleo transaccional del sistema y soporta tanto las operaciones diarias de los abogados como los procesos automatizados ejecutados por servicios externos.
+
+### 🧩 Entidades principales
+
+| Tabla | Función |
+|-------|---------|
+| `usuario` | Personal del estudio jurídico |
+| `cliente` | Persona representada |
+| `caso` | Expediente principal |
+| `ficha_laboral` | Información de admisión |
+| `etapa` | Catálogo de etapas |
+| `transicion_etapa` | Flujo permitido entre etapas |
+| `historial_caso` | Registro histórico inmutable |
+| `telegrama` | Telegramas laborales |
+| `documento` | Archivos asociados al caso |
+| `vencimiento` | Agenda y recordatorios |
+| `comunicacion` | Comunicaciones con clientes |
+| `backup` | Registro de respaldos automáticos |
+
+### 🔗 Relaciones principales
+
+| Relación | Cardinalidad |
+|----------|--------------|
+| Cliente → Caso | 1:N |
+| Usuario → Caso | 1:N |
+| Caso → Ficha Laboral | 1:1 |
+| Caso → Documento | 1:N |
+| Caso → Vencimiento | 1:N |
+| Caso → Comunicación | 1:N |
+| Caso → Historial | 1:N |
+| Etapa → Caso | 1:N |
+| Etapa ↔ Etapa | N:M mediante Transición |
+
+### 📊 Diagrama Entidad-Relación
 
 ```mermaid
 erDiagram
@@ -77,22 +222,137 @@ erDiagram
     USUARIO ||--o{ VENCIMIENTO : "crea"
 ```
 
-## Cómo funciona la máquina de estados
+---
 
-El estado de un caso es su `etapa_actual_id`. Para mover un caso:
+## 🏗️ Principios de diseño
 
-1. **Avanzar:** verificar que exista una fila en `transicion_etapa` con `(etapa_origen_id = etapa_actual, etapa_destino_id = destino)`. Si existe, actualizar `caso.etapa_actual_id` e **insertar** una fila en `historial_caso` (`etapa_anterior`, `etapa_nueva`, `autor`, `evento = 'AVANCE'`).
-2. **Retroceder:** permitido **con confirmación** del usuario (salvaguarda ante errores). Se registra igual en `historial_caso` con `evento = 'RETROCESO'`.
-3. **Etapas terminales:** si `etapa.es_terminal = true` (Acuerdo, Indemnización, Sentencia), el caso está cerrado y no admite nuevos avances.
+### 🔄 Estados configurables
 
-## Invariantes a respetar en la capa de servicio
+Los estados del sistema son **datos persistidos**, no enums de código. Las tablas `etapa` y `transicion_etapa` permiten modificar los flujos procesales sin desplegar nuevas versiones del sistema. Esto resulta esencial dado que *Laboral* y *ART* tienen recorridos distintos (fases extrajudicial y judicial, hasta tres telegramas con múltiples resultados de entrega, ramificación por tipo de siniestro en ART).
 
-Algunas reglas no las puede garantizar la base por sí sola; deben validarse en el backend:
+### 📜 Historial inmutable
 
-- `caso.etapa_actual_id` debe apuntar a una `etapa` cuya `area` coincida con `caso.area`. (No mezclar etapas de Laboral con casos ART.)
-- `caso.tipo_reclamo` se completa **solo** cuando `area = ART`; es NULL en Laboral.
-- `telegrama` solo aplica a casos del área Laboral.
-- `ficha_laboral` es 1:1: no crear más de una por caso.
-- `historial_caso` es **append-only**: jamás `UPDATE` ni `DELETE`.
-- `documento.subido_por` siempre es un `usuario`; no existe carga por parte del cliente.
-- `comunicacion` no se envía automáticamente: el cambio a `APROBADO` lo hace una persona.
+La tabla `historial_caso` es **append-only**. No se permiten operaciones `UPDATE` ni `DELETE`: únicamente inserciones. Esto garantiza la auditabilidad completa de cada expediente.
+
+### 🤖 IA bajo supervisión humana
+
+La IA genera **borradores** de comunicación. La aprobación y el envío siempre requieren la intervención de un abogado. Ningún mensaje sale del sistema de forma automática.
+
+### 📎 Gestión documental controlada
+
+Todos los documentos son cargados por usuarios internos del estudio. Los clientes nunca suben archivos al sistema.
+
+---
+
+## 🧪 Metodología
+
+El proyecto se desarrolló siguiendo **SDD (Spec Driven Development)** con iteración ágil:
+
+- Las especificaciones se escriben **antes** de la implementación.
+- Cada decisión técnica relevante queda registrada en un ADR (Architecture Decision Record).
+- Los entregables académicos (documento de tesis) y técnicos (código, esquema, *seeds*) se desarrollan en paralelo.
+
+La documentación completa del proyecto se mantiene en el repositorio de especificaciones `iuris-docs/`.
+
+---
+
+## 📐 Decisiones de arquitectura (ADR)
+
+Las decisiones técnicas se documentan como ADRs en `iuris-docs/`. El conjunto cubre:
+
+- Definición del stack tecnológico completo.
+- Orquestación de IA mediante n8n.
+- IA estrictamente asistiva (sin lógica de IA en el backend).
+- Uso de datos sintéticos para pruebas.
+- Adopción de SDD como metodología.
+- OpenAI como proveedor de LLM.
+- Cloudflare R2 como almacenamiento de documentos.
+- Estados modelados como datos (no como enums).
+
+> Las decisiones más representativas: **estados-como-datos** (los flujos legales son demasiado específicos por área y cliente para un enum fijo) e **IA asistiva por diseño** (la separación FastAPI / n8n impide estructuralmente que la IA actúe de forma autónoma).
+
+---
+
+## 📂 Estructura del repositorio
+
+> Estructura indicativa — ajustar a la organización real del repo.
+
+```
+iuris/
+├── backend/            # API FastAPI, modelos, migraciones Alembic
+│   └── CLAUDE.md
+├── frontend/           # Aplicación React
+│   └── CLAUDE.md
+├── iuris-docs/         # Especificaciones, ADRs, esquema DBML, seeds, tesis
+├── docker-compose.yml
+├── CLAUDE.md
+└── README.md
+```
+
+---
+
+## ⚙️ Instalación y ejecución
+
+> Comandos de referencia — adaptar a la configuración real del proyecto.
+
+### Requisitos previos
+
+- Docker y Docker Compose
+- Node.js 20+ (desarrollo del frontend)
+- Python 3.12+ (desarrollo del backend)
+
+### Variables de entorno
+
+Copiar el archivo de ejemplo y completar las credenciales:
+
+```bash
+cp .env.example .env
+```
+
+Variables principales: `DATABASE_URL`, `OPENAI_API_KEY`, credenciales de Cloudflare R2, secreto JWT y URLs de los webhooks de n8n.
+
+### Levantar el entorno
+
+```bash
+git clone <url-del-repositorio>
+cd iuris
+docker compose up -d --build
+```
+
+### Accesos
+
+| Servicio | URL |
+|----------|-----|
+| Frontend | `http://localhost:5173` |
+| API (Swagger) | `http://localhost:8000/docs` |
+| n8n | `http://localhost:5678` |
+
+---
+
+## 🔮 Trabajo futuro
+
+- **Portal del cliente.** Seguimiento del estado del caso en lenguaje llano (análogo al seguimiento de envíos de Mercado Libre), con publicaciones curadas por el abogado. Quedó fuera del MVP y se documenta como línea de evolución del sistema.
+- **Confirmación de integración del generador de telegramas** según la versión de n8n del VPS (nodo *Code* vs. microservicio dedicado).
+
+---
+
+## 👥 Equipo y contexto académico
+
+| Integrante | Rol |
+|------------|-----|
+| **Lucas Russo** | Desarrollador Backend / Arquitectura |
+| **Facundo Bustamante** | Desarrollador Frontend |
+| **Lisandro Romero** | Desarrollador Full Stack |
+
+**Director de proyecto:** Prof. Alberto Cortez
+
+**Universidad Tecnológica Nacional — Facultad Regional Mendoza**
+Tecnicatura Universitaria en Programación · Proyecto Final · Comisión 3 · 2025–2026
+
+---
+
+<div align="center">
+
+*Proyecto desarrollado con fines académicos para un estudio jurídico real de Mendoza, Argentina.*
+
+</div>
