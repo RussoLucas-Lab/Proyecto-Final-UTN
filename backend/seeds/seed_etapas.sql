@@ -1,14 +1,12 @@
 -- =====================================================================
 -- Iuris — Seed de etapas y transiciones del ciclo de vida de los casos
--- Flujos reales por área (ver INFORME_RELEVAMIENTO.md §3).
--- Idempotente: puede ejecutarse varias veces sin duplicar.
--- Requiere las tablas `etapa` y `transicion_etapa` (DBML v2) y el enum
--- `area_derecho`. Ejecutar luego de las migraciones del esquema.
+-- Fuente: ADR-0008, RN-04/RN-09, docs/03-arquitectura/diagramas.md.
+-- (SDD: la spec manda; estos datos deben coincidir con los diagramas.)
+-- Idempotente: puede ejecutarse varias veces sin duplicar datos.
+-- Requiere las tablas `etapa` y `transicion_etapa` ya migradas y el
+-- tipo enum `area_derecho`. Ejecutar DESPUÉS de `alembic upgrade head`.
+-- Comando oficial: psql "$DATABASE_URL" -f backend/seeds/seed_etapas.sql
 -- =====================================================================
-
--- Unicidad por (area, nombre): permite idempotencia y referenciar
--- etapas por nombre en las transiciones.
-CREATE UNIQUE INDEX IF NOT EXISTS ux_etapa_area_nombre ON etapa (area, nombre);
 
 -- ----------------------------- ETAPAS -------------------------------
 INSERT INTO etapa (area, fase, nombre, orden, es_terminal) VALUES

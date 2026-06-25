@@ -1,9 +1,13 @@
 """
 Seed del ciclo de vida de los casos (etapas + transiciones) para Iuris.
 
-Flujos reales por área (ver INFORME_RELEVAMIENTO.md §3). Los datos están
-desacoplados del mecanismo: `ETAPAS` y `TRANSICIONES` describen el grafo;
-`seed(engine)` lo carga de forma idempotente con SQLAlchemy.
+Fuente: ADR-0008, RN-04/RN-09, docs/03-arquitectura/diagramas.md.
+(SDD: la spec manda; estos datos deben coincidir con los diagramas.)
+
+Los datos están desacoplados del mecanismo: `ETAPAS` y `TRANSICIONES`
+describen el grafo; `seed(engine)` lo carga de forma idempotente con
+SQLAlchemy. Este módulo es el equivalente programático de `seed_etapas.sql`
+(fuente canónica) para tests y base sintética.
 
 Uso:
     from sqlalchemy import create_engine
@@ -67,12 +71,14 @@ TRANSICIONES = [
 
 
 def seed(engine):
-    """Carga etapas y transiciones de forma idempotente."""
+    """Carga etapas y transiciones de forma idempotente.
+
+    Apoya la idempotencia en las restricciones únicas ya provistas por la
+    migración: uq_etapa_area_nombre (area, nombre) y
+    uq_transicion_etapa_etapa_origen_id_etapa_destino_id.
+    No crea índices ni restricciones (eso pertenece a las migraciones).
+    """
     with engine.begin() as conn:
-        conn.execute(text(
-            "CREATE UNIQUE INDEX IF NOT EXISTS ux_etapa_area_nombre "
-            "ON etapa (area, nombre)"
-        ))
         for area, fase, nombre, orden, es_terminal in ETAPAS:
             conn.execute(
                 text(
