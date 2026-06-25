@@ -30,8 +30,8 @@
 
 ## 5. Verificación e integración final
 
-- [ ] 5.1 Ejecutar el seed canónico contra la DB del compose y verificar conteos con `psql` (18/19)
-- [ ] 5.2 Re-ejecutar el seed y confirmar idempotencia (conteos estables)
+- [x] 5.1 Ejecutar el seed canónico contra la DB del compose y verificar conteos con `psql` (18/19)
+- [x] 5.2 Re-ejecutar el seed y confirmar idempotencia (conteos estables)
 - [x] 5.3 Confirmar que NO se creó ni modificó ninguna migración Alembic (solo datos)
 - [x] 5.4 Actualizar `docs/changemap.md`: marcar la fila del seed del ciclo de vida como completada (de 🔲 a hecho)
-- [ ] 5.5 Confirmar que la cobertura de tests del seed cumple el umbral del proyecto (≥ 80%) y commit con refs a spec (`[refs ADR-0008, RN-04]`)
+- [ ] 5.5 Confirmar que la cobertura de tests del seed cumple el umbral del proyecto (≥ 80%) y commit con refs a spec (`[refs ADR-0008, RN-04]`) — BLOQUEADO: tests parcialmente ejecutados sin BD (2/10 passed, 8 skipped); cobertura insuficiente
