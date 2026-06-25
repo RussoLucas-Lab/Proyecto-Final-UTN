@@ -70,6 +70,39 @@ Cada feature contiene típicamente: `router.py` (endpoints, incluidos los `/inte
 - `GET /comunicaciones?estado=PENDIENTE_REVISION` · `PATCH /comunicaciones/{id}`.
 - Documentos en R2 vía **URLs prefirmadas** (init → PUT a R2 → registrar metadata). (ADR-0007)
 
+## Migraciones de base de datos
+
+La capa de persistencia usa **SQLAlchemy 2.x** (modelos en `features/*/models.py`, `Base` en `core/db_base.py`) y **Alembic** para migraciones.
+
+### En Docker (automático)
+`docker compose up --build` corre `alembic upgrade head` dentro del contenedor backend antes de arrancar Uvicorn. El orden está garantizado por `depends_on: db: condition: service_healthy`.
+
+### En local
+```bash
+# Con la DB del compose corriendo en localhost:5432 (o la que corresponda):
+export DATABASE_URL=postgresql://iuris:changeme@localhost:5432/iuris
+cd backend
+alembic upgrade head      # aplica todas las migraciones pendientes
+alembic current           # muestra la revisión activa
+alembic downgrade base    # revierte todo (útil para testing)
+```
+
+### Verificación post-migración
+- `psql $DATABASE_URL -c "\dt"` → debe listar las 13 tablas.
+- `psql $DATABASE_URL -c "\dT"` → debe listar los 12 tipos enum.
+- `alembic current` → debe mostrar `001 (head)`.
+- `etapa`, `transicion_etapa` e `historial_caso` existen y están vacías (sin seed).
+
+### Agregar una nueva revisión
+```bash
+alembic revision --autogenerate -m "descripcion del cambio"
+# Revisar el archivo generado en alembic/versions/ antes de aplicarlo.
+alembic upgrade head
+```
+
+> **Regla SDD**: toda modificación del esquema entra como nueva revisión de Alembic
+> y actualiza `docs/03-arquitectura/modelo-de-datos.dbml` en el mismo PR.
+
 ## Convenciones
 
 - PEP 8; **Black**, **isort**, **ruff**; type hints; validación Pydantic.

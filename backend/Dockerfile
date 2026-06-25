@@ -6,9 +6,16 @@ WORKDIR /backend
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia el código fuente
+# Copia el código fuente y los artefactos de migración
 COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# entrypoint.sh corre "alembic upgrade head" antes de arrancar Uvicorn.
+# El orden de arranque (db healthy → backend) está garantizado por
+# depends_on: condition: service_healthy en docker-compose.yml.
+ENTRYPOINT ["./entrypoint.sh"]

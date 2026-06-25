@@ -26,7 +26,7 @@
 | ID spec | Funcionalidad | Capa | Feature | Prioridad | Estado | Rama/PR | Notas |
 |---------|---------------|------|---------|-----------|--------|---------|-------|
 | RNF-07 / 07-seg | Esqueleto del repo + `docker-compose` (frontend, backend, db, n8n) y `GET /health` | backend·frontend·db·n8n | plataforma | P0 | 🟡 | `master` | Esqueleto implementado: `backend/app/`, `docker-compose.yml`, `.env.example`, `GET /health` verificado localmente. Smoke test Docker pendiente de ejecución manual. |
-| RNF-09 / 10-seg | Migraciones Alembic + esquema base (DBML v2) | db·backend | plataforma | P0 | 🔲 | — | Fuente: `03-arquitectura/modelo-de-datos.dbml`. |
+| RNF-09 / 10-seg | Migraciones Alembic + esquema base (DBML v2) | db·backend | plataforma | P0 | ✅ | `master` (change `migraciones-esquema-base`) | 13 tablas, 12 enums, todas las FKs/índices/unicidades del DBML v2. `entrypoint.sh` corre `alembic upgrade head` antes de Uvicorn. Sin seed (próximo change ADR-0008). |
 | ADR-0008 / RN-04 | Seed del ciclo de vida (18 etapas, 19 transiciones) | db·backend | casos | P0 | 🔲 | — | `docs/seeds/seed_etapas.sql` + `.py`. Requiere esquema migrado. |
 
 ### auth
@@ -110,6 +110,7 @@
 | 2026-06-24 | Correcciones de cosmética en docs: etiqueta RF-06→RF-07 en `contratos-api.md`; artefacto heredoc eliminado de `seguridad-y-despliegue.md`; referencia `07-operacion/` → `09-operacion/` en `arquitectura-del-sistema.md`; ruta del seed corregida a `backend/seeds/` en `CLAUDE.md`. Ítems 9-12 de pendientes cerrados. | `04-api/contratos-api.md`, `07-seguridad-y-despliegue/seguridad-y-despliegue.md`, `03-arquitectura/arquitectura-del-sistema.md`, `CLAUDE.md` | Lucas |
 | 2026-06-24 | Sincronización docs #1-8: endpoints de usuarios (UC-13), ficha laboral (`PUT /casos/{id}/ficha-laboral`), telegramas (`POST/PATCH`), comunicación manual (persiste en BD), vencimientos (`PATCH /vencimientos/{id}`), CSRF (double-submit cookie) y campos de telegrama en modelo DBML. Todos los huecos de spec cerrados; RF-23/RF-24 confirmados intencionales. Sin huecos abiertos. | `04-api/contratos-api.md`, `02-comportamiento/casos-de-uso.md`, `07-seguridad-y-despliegue/seguridad-y-despliegue.md`, `03-arquitectura/modelo-de-datos.dbml`, `03-arquitectura/modelo-de-datos.md`, `08-features/generador-telegramas.md` | Lucas |
 | 2026-06-25 | Change `esqueleto-plataforma` (RNF-07): esqueleto del monorepo feature-first. Creados `backend/app/` (main.py, core/, shared/, features/), `backend/requirements.txt`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` (4 servicios, red privada, volúmenes nombrados), `.env.example` con activas + placeholders. `GET /health` implementado y verificado localmente (200 `{"status":"UP"}`). Smoke test Docker pendiente de ejecución manual. | RNF-07, RNF-13 | Claude Code |
+| 2026-06-25 | Change `migraciones-esquema-base` (RNF-09): SQLAlchemy 2.x + Alembic instalados. Infraestructura transversal (`core/db_base.py`, `core/database.py`, `core/models_registry.py`, `shared/enums.py`). 13 modelos ORM en `features/*/models.py`. Migración inicial `001_esquema_base_inicial.py` con 12 enums y 13 tablas en orden FK correcto. `entrypoint.sh` en Dockerfile ejecuta `alembic upgrade head` antes de Uvicorn. `depends_on: service_healthy` ya configurado. Sin seed (próximo change). | RNF-09, ADR-0009 | Claude Code |
 
 ---
 

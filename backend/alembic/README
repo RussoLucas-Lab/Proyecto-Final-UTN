@@ -1,0 +1,14 @@
+Generic single-database configuration with Iuris custom setup.
+
+Para correr migraciones localmente:
+  cd backend
+  alembic upgrade head
+
+Para generar una nueva revisión:
+  alembic revision --autogenerate -m "descripcion del cambio"
+
+Para ver el estado actual:
+  alembic current
+
+Para revertir todas las migraciones:
+  alembic downgrade base
