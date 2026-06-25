@@ -18,35 +18,35 @@ importers:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
       react-router-dom:
-        specifier: ^6.26.2
+        specifier: ^6.30.4
         version: 6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
       '@types/react':
-        specifier: ^18.3.5
+        specifier: ^18.3.31
         version: 18.3.31
       '@types/react-dom':
-        specifier: ^18.3.0
+        specifier: ^18.3.7
         version: 18.3.7(@types/react@18.3.31)
       '@vitejs/plugin-react':
-        specifier: ^4.3.1
+        specifier: ^4.7.0
         version: 4.7.0(vite@5.4.21)
       eslint:
-        specifier: ^9.9.0
+        specifier: ^9.39.4
         version: 9.39.4
       eslint-plugin-react-hooks:
-        specifier: ^5.1.0-rc.0
+        specifier: ^5.2.0
         version: 5.2.0(eslint@9.39.4)
       eslint-plugin-react-refresh:
-        specifier: ^0.4.9
+        specifier: ^0.4.26
         version: 0.4.26(eslint@9.39.4)
       typescript:
-        specifier: ^5.5.3
+        specifier: ^5.9.3
         version: 5.9.3
       vite:
-        specifier: ^5.4.1
+        specifier: ^5.4.21
         version: 5.4.21
       vitest:
-        specifier: ^2.0.5
+        specifier: ^2.1.9
         version: 2.1.9
 
 packages:
@@ -660,8 +660,8 @@ packages:
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
 
-  electron-to-chromium@1.5.377:
-    resolution: {integrity: sha512-cH1jZgJHoezfTnKfKwnScpHywTFVnJUNITDPREFdhNjiuD502+QFpG0Qk7G8jhsV/f+CEAFlIrzP1fT+IMb92g==}
+  electron-to-chromium@1.5.378:
+    resolution: {integrity: sha512-VinvOAuuPmdD1guEgGv5f2Qp7/vlfqOrUOMYNnOD4wj3pit8kRsQHzfIf6teyUGWo15Tg5+bOJaRunvyltpVWQ==}
 
   es-module-lexer@1.7.0:
     resolution: {integrity: sha512-jEQoCwk8hyb2AZziIOLhDqpm5+2ww5uIE6lkO/6jcOCusfk6LhMHpXXfBLXTZ7Ydyt0j4VoUQv6uGNYbdW+kBA==}
@@ -874,8 +874,8 @@ packages:
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
-  node-releases@2.0.48:
-    resolution: {integrity: sha512-1uz8041X6LoI6ZSdZacM9lVY28vuzDlSKitnpbSNK0RfKoIJkX29NBPVEFXhnuSuEOA9Ww0xnPJ+ILWbGAv8DA==}
+  node-releases@2.0.49:
+    resolution: {integrity: sha512-f06bl1D+8ZDkn2oOQQKAh5/otFWqVnM1Q5oerA8Pex7UfT66Tx4IPHIqVVFKqFT3FUtaDstdgkM7yT7JWhqxfw==}
     engines: {node: '>=18'}
 
   optionator@0.9.4:
@@ -1595,8 +1595,8 @@ snapshots:
     dependencies:
       baseline-browser-mapping: 2.10.38
       caniuse-lite: 1.0.30001799
-      electron-to-chromium: 1.5.377
-      node-releases: 2.0.48
+      electron-to-chromium: 1.5.378
+      node-releases: 2.0.49
       update-browserslist-db: 1.2.3(browserslist@4.28.4)
 
   cac@6.7.14: {}
@@ -1646,7 +1646,7 @@ snapshots:
 
   deep-is@0.1.4: {}
 
-  electron-to-chromium@1.5.377: {}
+  electron-to-chromium@1.5.378: {}
 
   es-module-lexer@1.7.0: {}
 
@@ -1867,7 +1867,7 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  node-releases@2.0.48: {}
+  node-releases@2.0.49: {}
 
   optionator@0.9.4:
     dependencies:
