@@ -5,21 +5,17 @@
  * La búsqueda de cliente es local/mock hasta que exista el autocomplete de clientes.
  * Al crear, llama a api.crear() y redirige a la página de detalle según el área.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as casosApi from './api';
 import type { AreaDerecho, TipoReclamoArt } from './types';
+import { listar as listarClientes } from '../clientes/api';
+import type { Cliente } from '../clientes/types';
 
 const MOCK_ABOGADOS = [
   { id: 1, label: 'Dr. Martín Suárez (Socio)' },
   { id: 2, label: 'Dra. Laura Vega (Laboral)' },
   { id: 3, label: 'Dr. Pablo Rossi (ART)' },
-];
-
-const MOCK_CLIENTES = [
-  { id: 1, nombre: 'González Pérez, Carlos', dni: '28.456.123' },
-  { id: 2, nombre: 'Martínez Rojas, Ana', dni: '31.112.005' },
-  { id: 3, nombre: 'Romero, Beatriz', dni: '25.780.440' },
 ];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -60,7 +56,9 @@ export default function NuevoCasoPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<typeof MOCK_CLIENTES[0] | null>(null);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+  const [resultados, setResultados] = useState<Cliente[]>([]);
+  const [buscando, setBuscando] = useState(false);
   const [area, setArea] = useState<AreaDerecho | null>(null);
   const [tipoReclamo, setTipoReclamo] = useState<TipoReclamoArt | null>(null);
   const [abogadoId, setAbogadoId] = useState<number>(MOCK_ABOGADOS[0].id);
@@ -77,11 +75,17 @@ export default function NuevoCasoPage() {
     setClienteSeleccionado(null);
   }
 
-  const resultados = MOCK_CLIENTES.filter(
-    (c) =>
-      c.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.dni.includes(searchQuery),
-  );
+  useEffect(() => {
+    if (!searchQuery.trim()) { setResultados([]); return; }
+    const timer = setTimeout(() => {
+      setBuscando(true);
+      listarClientes({ search: searchQuery })
+        .then(setResultados)
+        .catch(() => setResultados([]))
+        .finally(() => setBuscando(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const abogadoLabel = MOCK_ABOGADOS.find((a) => a.id === abogadoId)?.label ?? '—';
   const canCreate =
@@ -187,12 +191,13 @@ export default function NuevoCasoPage() {
 
             {showResults && (
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {resultados.length === 0 ? (
+                {buscando ? (
+                  <p style={{ fontSize: 13, color: '#9BA8B8', margin: 0 }}>Buscando…</p>
+                ) : resultados.length === 0 ? (
                   <p style={{ fontSize: 13, color: '#9BA8B8', margin: 0 }}>
                     No se encontraron clientes.
                   </p>
-                ) : (
-                  resultados.map((cli) => (
+                ) : resultados.map((cli) => (
                     <div
                       key={cli.id}
                       onClick={() => {

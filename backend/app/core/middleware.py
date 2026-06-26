@@ -19,6 +19,9 @@ _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # Paths exentos de CSRF: el login no tiene sesión previa, emite la cookie csrf_token
 _CSRF_EXEMPT_PATHS = frozenset({"/api/v1/auth/login"})
 
+# Paths de la UI de desarrollo — se omite CSP estricta para que Swagger cargue
+_SWAGGER_PATHS = frozenset({"/docs", "/redoc", "/openapi.json"})
+
 
 class CSRFMiddleware(BaseHTTPMiddleware):
     """Middleware CSRF double-submit cookie (RNF-11, D4).
@@ -72,15 +75,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; "
-            "connect-src 'self'; "
-            "frame-ancestors 'none';"
-        )
         response.headers["Strict-Transport-Security"] = (
             "max-age=31536000; includeSubDomains"
         )
+        if request.url.path not in _SWAGGER_PATHS:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data:; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none';"
+            )
         return response

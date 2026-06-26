@@ -1,7 +1,8 @@
 import logging
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -24,6 +25,8 @@ app = FastAPI(
     title="Iuris API",
     description="API de gestión jurídica para el estudio (Laboral y ART).",
     version="0.1.0",
+    docs_url=None,  # se sirve manualmente abajo con CSRF interceptor
+    swagger_ui_parameters={"withCredentials": True},
 )
 
 # ── Rate limiting (SlowAPI) ────────────────────────────────────────────────────
@@ -63,6 +66,37 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 def health() -> dict[str, str]:
     """Endpoint de salud. Sin auth, sin DB. (RNF-13)"""
     return {"status": "UP"}
+
+
+_CSRF_INTERCEPTOR = """
+<script>
+(function () {
+  function getCookie(name) {
+    var m = document.cookie.match('(?:^|;)\\s*' + name + '=([^;]*)');
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  var origFetch = window.fetch;
+  window.fetch = function (url, opts) {
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    var csrf = getCookie('csrf_token');
+    if (csrf) opts.headers['X-CSRF-Token'] = csrf;
+    return origFetch(url, opts);
+  };
+})();
+</script>
+"""
+
+
+@app.get("/docs", include_in_schema=False)
+async def swagger_ui_html() -> HTMLResponse:
+    html = get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="Iuris API",
+        swagger_ui_parameters={"withCredentials": True},
+    )
+    body = html.body.decode().replace("</body>", _CSRF_INTERCEPTOR + "</body>")
+    return HTMLResponse(body)
 
 
 # ── Routers ────────────────────────────────────────────────────────────────────
