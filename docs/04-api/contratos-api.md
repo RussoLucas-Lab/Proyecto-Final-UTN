@@ -87,21 +87,69 @@ Activa o desactiva (baja lógica). Un SOCIO no puede desactivarse a sí mismo.
 
 ## Clientes
 
+> **Auth**: JWT en cookie HttpOnly. Mutaciones (`POST`/`PUT`) protegidas por CSRF double-submit (`X-CSRF-Token`).
+> **RBAC**: `GET` accesible por todo usuario autenticado (RN-08); `POST`/`PUT` requieren ABOGADO o SOCIO (D4).
+
 ### GET /clientes?search=&page=
-Lista paginada. *(RF-07)*
+Lista paginada de clientes. Parámetros opcionales: `search` (filtra por nombre ILIKE o DNI), `page` (base 1, tamaño fijo 20).
+**200** lista de `ClienteResponse`. **401** sin sesión. *(RF-07)*
 
 ### POST /clientes
-```json
-{ "nombre": "Acme S.A.", "dni": "30111222", "telefono": "+54...", "email": "c@acme.test" }
-```
-**201** → cliente creado. **409** si DNI duplicado (RN-03). *(RF-05)*
+Crea un cliente nuevo (admisión). `nombre` y `dni` son obligatorios; el resto opcionales.
 
-### GET /clientes/{id} · PUT /clientes/{id}
-Consulta y edición. *(RF-06)*
+> **Desvío D2** respecto al ejemplo original (que solo tenía `nombre`, `dni`, `telefono`, `email`):
+> el modelo DBML v2 incluye `cuil` y `domicilio_real` desglosado, que son necesarios para telegramas y comunicaciones.
+
+```json
+{
+  "nombre": "García Rodríguez, Juan",
+  "dni": "28456123",
+  "cuil": "20-28456123-4",
+  "telefono": "0261-4567890",
+  "email": "juan@iuris.test",
+  "domicilio_real": "Av. San Martín 1234",
+  "domicilio_real_cp": "5500",
+  "domicilio_real_localidad": "Mendoza",
+  "domicilio_real_provincia": "Mendoza",
+  "domicilio_coincide_dni": true
+}
+```
+
+**201** → `ClienteResponse`. **409** DNI duplicado (RN-03). **422** payload inválido. **403** sin rol ABOGADO/SOCIO. *(RF-05)*
+
+### GET /clientes/{id}
+Consulta un cliente por id. **200** → `ClienteResponse`. **404** no encontrado. **401** sin sesión. *(RF-06)*
+
+### PUT /clientes/{id}
+Edita los datos de un cliente. Mismo body que `POST /clientes`.
+**200** → `ClienteResponse`. **404** no encontrado. **409** nuevo DNI ya registrado para otro cliente. **422** payload inválido. *(RF-06)*
+
+### ClienteResponse (schema de respuesta)
+```json
+{
+  "id": 1,
+  "nombre": "García Rodríguez, Juan",
+  "dni": "28456123",
+  "cuil": "20-28456123-4",
+  "telefono": "0261-4567890",
+  "email": "juan@iuris.test",
+  "domicilio_real": "Av. San Martín 1234",
+  "domicilio_real_cp": "5500",
+  "domicilio_real_localidad": "Mendoza",
+  "domicilio_real_provincia": "Mendoza",
+  "domicilio_coincide_dni": true,
+  "creado_en": "2026-06-26T10:00:00"
+}
+```
 
 ## Casos
 
+> **Auth**: JWT en cookie HttpOnly. Mutaciones (`POST`/`PUT`) protegidas por CSRF double-submit (`X-CSRF-Token`).
+> **RBAC**: `GET` accesible por todo usuario autenticado; `POST`/`PUT` requieren ABOGADO o SOCIO.
+> **ADR-0008**: La etapa inicial se resuelve por dato (menor `orden` del área), nunca hardcodeada.
+
 ### POST /casos
+**Request body** (`CasoCreate`):
 ```json
 {
   "cliente_id": 12,
@@ -112,29 +160,116 @@ Consulta y edición. *(RF-06)*
   "fecha_inicio": "2026-06-11",
   "observaciones": "Reclamo laboral.",
   "ficha_laboral": {
-    "empleador_nombre": "Acme S.A.", "razon_social": "Acme S.A.",
-    "direccion_trabajo": "Av. San Martín 1000, Mendoza", "fecha_inicio_laboral": "2020-03-01",
-    "jornada": "8 h", "tareas": "Operario", "remuneracion": 850000, "cct_aplicable": "CCT 130/75",
-    "registrado": true, "notas": ""
+    "empleador_nombre": "Acme S.A.",
+    "razon_social": "Acme S.A.",
+    "direccion_trabajo": "Av. San Martín 1000, Mendoza",
+    "fecha_inicio_laboral": "2020-03-01",
+    "jornada": "8 h",
+    "tareas": "Operario",
+    "remuneracion": "850000.00",
+    "cct_aplicable": "CCT 130/75",
+    "registrado": true,
+    "notas": ""
   }
 }
 ```
-El caso se crea en la **etapa inicial** del área ("Toma del cliente") y genera la primera entrada de historial. En ART, `tipo_reclamo` es `ACCIDENTE` o `ENFERMEDAD`. La **ficha laboral** viaja anidada (1:1 con el caso) y puede omitirse y completarse luego. **201**. *(RF-08, RF-09, RN-05, RN-11)*
+Reglas:
+- `tipo_reclamo` (`ACCIDENTE` | `ENFERMEDAD`) es **obligatorio** para ART y **nulo** para LABORAL.
+- La `ficha_laboral` es opcional al crear; se puede completar luego con `PUT /casos/{id}/ficha-laboral`.
+- El caso se crea en la **etapa de menor `orden`** del área (ADR-0008, RN-04).
+- Se genera automáticamente la primera entrada en `historial_caso` con `evento="creación"` y `etapa_anterior_id=null`.
 
-### PUT /casos/{id}/ficha-laboral
-Crea o actualiza la ficha de admisión laboral del caso (1:1). *(RF-09)*
+**201** → `CasoResponse`. **422** si ART sin `tipo_reclamo` o LABORAL con `tipo_reclamo`. **404** cliente o abogado no existen. **401** sin sesión. **403** sin CSRF o sin rol. *(RF-08, RF-09, RN-04, RN-05)*
 
-### GET /casos?area=&etapa=&abogado_id=&cliente_id=&page=
-Listado con filtros. *(RF-13)*
+### CasoResponse (schema de respuesta — listado y mutaciones)
+```json
+{
+  "id": 1,
+  "cliente_id": 12,
+  "abogado_responsable_id": 3,
+  "area": "LABORAL",
+  "tipo_reclamo": null,
+  "codigo_expediente": "EXP-2026-000123",
+  "etapa_actual_id": 1,
+  "fecha_inicio": "2026-06-11",
+  "observaciones": "Reclamo laboral.",
+  "creado_en": "2026-06-26T10:00:00"
+}
+```
+
+### CasoDetalleResponse (schema de detalle — GET /casos/{id})
+```json
+{
+  "id": 1,
+  "cliente_id": 12,
+  "abogado_responsable_id": 3,
+  "area": "LABORAL",
+  "tipo_reclamo": null,
+  "codigo_expediente": "EXP-2026-000123",
+  "etapa_actual_id": 2,
+  "fecha_inicio": "2026-06-11",
+  "observaciones": "Reclamo laboral.",
+  "creado_en": "2026-06-26T10:00:00",
+  "etapa_actual": {
+    "id": 2,
+    "area": "LABORAL",
+    "fase": "EXTRAJUDICIAL",
+    "nombre": "Telegrama 1",
+    "orden": 2,
+    "es_terminal": false
+  },
+  "ficha": {
+    "id": 1,
+    "caso_id": 1,
+    "empleador_nombre": "Acme S.A.",
+    "remuneracion": "850000.00"
+  },
+  "transiciones_validas": [
+    { "id": 3, "area": "LABORAL", "fase": "EXTRAJUDICIAL", "nombre": "Telegrama 2", "orden": 3, "es_terminal": false }
+  ]
+}
+```
+
+### GET /casos?area=&etapa_id=&abogado_id=&cliente_id=&page=
+Listado con filtros opcionales (todos opcionales). Paginado (base 1, tamaño 20).
+**200** → lista de `CasoResponse`. **401** sin sesión. *(RF-13)*
 
 ### GET /casos/{id}
-Detalle (cliente, área, etapa actual, ficha, fechas, observaciones). Incluye las **transiciones válidas** desde la etapa actual (para el stepper del frontend).
+Detalle completo: etapa actual como objeto, ficha laboral (si existe) y **transiciones válidas** desde la etapa actual.
+**200** → `CasoDetalleResponse`. **404** no encontrado. **401** sin sesión. *(RF-13)*
 
-### POST /casos/{id}/avanzar · POST /casos/{id}/retroceder
-Cambia la etapa. `avanzar` valida que exista una transición permitida desde la etapa actual (RN-04). `retroceder` requiere confirmación explícita (`{ "confirmar": true }`, RN-09). Ambos registran en `historial_caso`. *(RF-10, RF-11)*
+### PUT /casos/{id}/ficha-laboral
+Crea o actualiza (upsert) la ficha laboral del caso. Body: campos opcionales del schema `FichaLaboralUpsert` (todos son `null`able).
+**200** → `FichaLaboralResponse`. **404** caso no encontrado. **403** sin CSRF o sin rol. *(RF-09)*
+
+### POST /casos/{id}/avanzar
+**Request**:
+```json
+{ "etapa_destino_id": 3 }
+```
+Valida que exista una entrada en `transicion_etapa` desde la etapa actual hacia `etapa_destino_id`.
+**200** → `CasoResponse`. **409** si la transición no existe. **404** caso no encontrado. *(RF-10, RN-04)*
+
+### POST /casos/{id}/retroceder
+**Request**:
+```json
+{ "etapa_destino_id": 1, "confirmar": true }
+```
+Retrocede a cualquier etapa del mismo área (no usa `transicion_etapa` — lógica de aplicación).
+Sin `confirmar: true` responde **409** (protección RN-09). **409** también si la etapa destino es de otra área.
+**200** → `CasoResponse`. **404** caso no encontrado. *(RF-11, RN-09)*
 
 ### GET /casos/{id}/historial
-Historial inmutable del caso. *(RF-12, RN-06)*
+Historial **append-only** del caso en orden cronológico. No existe `DELETE` ni `PUT` sobre este recurso (RN-06).
+
+**200** → lista de `HistorialItemResponse`:
+```json
+[
+  { "id": 1, "caso_id": 1, "etapa_anterior_id": null, "etapa_nueva_id": 1, "evento": "creación", "autor_id": 3, "ocurrido_en": "2026-06-26T10:00:00" },
+  { "id": 2, "caso_id": 1, "etapa_anterior_id": 1, "etapa_nueva_id": 2, "evento": "avance", "autor_id": 3, "ocurrido_en": "2026-06-26T12:00:00" }
+]
+```
+**404** caso no encontrado. **401** sin sesión. *(RF-12, RN-05, RN-06)*
 
 ## Telegramas (Laboral)
 

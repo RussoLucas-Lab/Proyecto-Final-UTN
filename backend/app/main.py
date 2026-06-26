@@ -8,6 +8,8 @@ from slowapi.errors import RateLimitExceeded
 from app.core.middleware import CSRFMiddleware, SecurityHeadersMiddleware
 from app.core.rate_limit import limiter
 from app.features.auth.router import router as auth_router
+from app.features.casos.router import router as casos_router
+from app.features.clientes.router import router as clientes_router
 from app.features.usuarios.router import router as usuarios_router
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -66,3 +68,5 @@ def health() -> dict[str, str]:
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(usuarios_router, prefix="/api/v1")
+app.include_router(clientes_router, prefix="/api/v1")
+app.include_router(casos_router, prefix="/api/v1")

@@ -1,5 +1,19 @@
-import { useState } from 'react';
+/**
+ * Página de admisión completa de un nuevo cliente (RF-05, UC-02).
+ *
+ * Formulario detallado con datos de la persona, contacto y domicilio real.
+ * Al guardar, llama a POST /clientes y navega de vuelta al listado.
+ * Mensajes en español (AR) y manejo de errores (409 DNI duplicado, 422).
+ *
+ * Nota: los "Datos del trabajo" y "Situación registral" pertenecen a la
+ * ficha laboral del caso (RF-09), no al cliente. Esta sección queda como
+ * referencia visual para el futuro; los datos del trabajo se enviarán al
+ * crear el caso. Solo se persisten los datos del cliente en esta pantalla.
+ */
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as api from './api';
+import type { ClienteCreate } from './types';
 
 // ── shared style helpers ────────────────────────────────────────────────────
 
@@ -28,36 +42,12 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 };
 
-const selectStyle: React.CSSProperties = {
-  ...inputStyle,
-  cursor: 'pointer',
-  appearance: 'auto',
-};
-
-const textareaStyle: React.CSSProperties = {
-  width: '100%',
-  border: '1.5px solid #E5E2D8',
-  borderRadius: 7,
-  background: '#FAFAF7',
-  padding: '10px 12px',
-  fontSize: 13,
-  color: '#131C2E',
-  fontFamily: "'Inter', sans-serif",
-  boxSizing: 'border-box',
-  resize: 'vertical',
-  outline: 'none',
-};
-
 // ── sub-components ─────────────────────────────────────────────────────────
 
 function SectionHeader({ num, title }: { num: number; title: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-      <div style={{
-        width: 24, height: 24, borderRadius: '50%', background: '#1B3A6B',
-        color: '#fff', fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      }}>
+      <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#1B3A6B', color: '#fff', fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {num}
       </div>
       <span style={{ fontSize: 14, fontWeight: 700, color: '#1B3A6B', fontFamily: "'Inter', sans-serif" }}>
@@ -78,10 +68,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      background: '#FFFFFF', border: '1px solid #E5E2D8', borderRadius: 12,
-      padding: 22, marginBottom: 16,
-    }}>
+    <div style={{ background: '#FFFFFF', border: '1px solid #E5E2D8', borderRadius: 12, padding: 22, marginBottom: 16 }}>
       {children}
     </div>
   );
@@ -101,37 +88,61 @@ function CheckField({ label, checked, onChange }: { label: string; checked: bool
 export default function NuevoClientePage() {
   const navigate = useNavigate();
 
-  // Section 1 — Datos de la persona
+  // Datos de la persona (van a POST /clientes)
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [dni, setDni] = useState('');
   const [cuil, setCuil] = useState('');
   const [domicilio, setDomicilio] = useState('');
+  const [domicilioCp, setDomicilioCp] = useState('');
+  const [domicilioLocalidad, setDomicilioLocalidad] = useState('');
+  const [domicilioProvincia, setDomicilioProvincia] = useState('');
   const [domicilioCoincide, setDomicilioCoincide] = useState(false);
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
 
-  // Section 2 — Datos del trabajo
-  const [razonSocial, setRazonSocial] = useState('');
-  const [direccionTrabajo, setDireccionTrabajo] = useState('');
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [motivoCese, setMotivoCese] = useState('');
-  const [jornada, setJornada] = useState('');
-  const [tareas, setTareas] = useState('');
-  const [remuneracion, setRemuneracion] = useState('');
-  const [cct, setCct] = useState('');
-
-  // Section 3 — Situación registral
-  const [estadoAportes, setEstadoAportes] = useState('');
-  const [fechaAfip, setFechaAfip] = useState('');
-  const [sueldoNoCoincide, setSueldoNoCoincide] = useState(false);
-  const [jornadaNoCoincide, setJornadaNoCoincide] = useState(false);
-
-  // Section 4 — Notas
-  const [notas, setNotas] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const col2Grid: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 };
   const fieldGap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 14 };
+
+  async function handleGuardar() {
+    const nombreCompleto = [apellido.trim(), nombre.trim()].filter(Boolean).join(', ');
+    if (!nombreCompleto) { setError('El nombre y apellido son obligatorios.'); return; }
+    if (!dni.trim()) { setError('El DNI es obligatorio.'); return; }
+
+    const datos: ClienteCreate = {
+      nombre: nombreCompleto,
+      dni: dni.trim(),
+      cuil: cuil.trim() || null,
+      telefono: telefono.trim() || null,
+      email: email.trim() || null,
+      domicilio_real: domicilio.trim() || null,
+      domicilio_real_cp: domicilioCp.trim() || null,
+      domicilio_real_localidad: domicilioLocalidad.trim() || null,
+      domicilio_real_provincia: domicilioProvincia.trim() || null,
+      domicilio_coincide_dni: domicilioCoincide,
+    };
+
+    setSaving(true);
+    setError(null);
+    try {
+      await api.crear(datos);
+      navigate('/clientes');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('409')) {
+        setError('El DNI ingresado ya está registrado para otro cliente en el estudio.');
+      } else if (msg.includes('422')) {
+        setError('Datos inválidos. Verificá el formato del email y que nombre y DNI estén completos.');
+      } else {
+        setError('Error al guardar el cliente. Intentá de nuevo.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: '#F2F0EA', minHeight: '100vh', padding: '32px 32px 48px', boxSizing: 'border-box' }}>
@@ -142,9 +153,17 @@ export default function NuevoClientePage() {
           Admisión de cliente
         </h1>
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#7B8799', marginTop: 6, marginBottom: 0 }}>
-          Completá el formulario para registrar un nuevo cliente
+          Completá los datos de la persona para registrar un nuevo cliente
         </p>
       </div>
+
+      {/* Error global */}
+      {error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 16px', marginTop: 16, fontSize: 13, color: '#991B1B', fontFamily: "'Inter', sans-serif" }}>
+          {error}
+          <button onClick={() => setError(null)} style={{ float: 'right', background: 'none', border: 'none', cursor: 'pointer', color: '#991B1B', fontSize: 16 }}>×</button>
+        </div>
+      )}
 
       {/* Two-column layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20, marginTop: 24, alignItems: 'start' }}>
@@ -152,28 +171,39 @@ export default function NuevoClientePage() {
         {/* Left column */}
         <div>
 
-          {/* Section 1 */}
+          {/* Section 1 — Datos de la persona */}
           <SectionCard>
             <SectionHeader num={1} title="Datos de la persona" />
             <div style={fieldGap}>
               <div style={col2Grid}>
-                <Field label="Nombre">
+                <Field label="Nombre *">
                   <input style={inputStyle} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Carlos" />
                 </Field>
-                <Field label="Apellido">
+                <Field label="Apellido *">
                   <input style={inputStyle} value={apellido} onChange={e => setApellido(e.target.value)} placeholder="Ej: González" />
                 </Field>
               </div>
               <div style={col2Grid}>
-                <Field label="DNI">
-                  <input style={inputStyle} value={dni} onChange={e => setDni(e.target.value)} placeholder="Ej: 28.456.123" />
+                <Field label="DNI *">
+                  <input style={inputStyle} value={dni} onChange={e => setDni(e.target.value)} placeholder="Ej: 28456123" />
                 </Field>
                 <Field label="CUIL">
                   <input style={inputStyle} value={cuil} onChange={e => setCuil(e.target.value)} placeholder="Ej: 20-28456123-4" />
                 </Field>
               </div>
               <Field label="Domicilio real">
-                <input style={inputStyle} value={domicilio} onChange={e => setDomicilio(e.target.value)} placeholder="Calle, número, piso/depto, ciudad" />
+                <input style={inputStyle} value={domicilio} onChange={e => setDomicilio(e.target.value)} placeholder="Calle, número, piso/depto" />
+              </Field>
+              <div style={col2Grid}>
+                <Field label="Código postal">
+                  <input style={inputStyle} value={domicilioCp} onChange={e => setDomicilioCp(e.target.value)} placeholder="5500" />
+                </Field>
+                <Field label="Localidad">
+                  <input style={inputStyle} value={domicilioLocalidad} onChange={e => setDomicilioLocalidad(e.target.value)} placeholder="Mendoza" />
+                </Field>
+              </div>
+              <Field label="Provincia">
+                <input style={inputStyle} value={domicilioProvincia} onChange={e => setDomicilioProvincia(e.target.value)} placeholder="Mendoza" />
               </Field>
               <CheckField
                 label="El domicilio real coincide con el del DNI"
@@ -191,87 +221,10 @@ export default function NuevoClientePage() {
             </div>
           </SectionCard>
 
-          {/* Section 2 */}
-          <SectionCard>
-            <SectionHeader num={2} title="Datos del trabajo" />
-            <div style={fieldGap}>
-              <Field label="Razón social del empleador">
-                <input style={inputStyle} value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Nombre legal de la empresa" />
-              </Field>
-              <Field label="Dirección del trabajo">
-                <input style={inputStyle} value={direccionTrabajo} onChange={e => setDireccionTrabajo(e.target.value)} placeholder="Domicilio laboral" />
-              </Field>
-              <div style={col2Grid}>
-                <Field label="Fecha de inicio">
-                  <input style={inputStyle} type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} />
-                </Field>
-                <Field label="Motivo de cese">
-                  <input style={inputStyle} value={motivoCese} onChange={e => setMotivoCese(e.target.value)} placeholder="Ej: Despido sin causa" />
-                </Field>
-              </div>
-              <Field label="Jornada laboral">
-                <select style={selectStyle} value={jornada} onChange={e => setJornada(e.target.value)}>
-                  <option value="">Seleccionar...</option>
-                  <option value="completa">Completa</option>
-                  <option value="parcial">Parcial</option>
-                  <option value="variable">Variable</option>
-                </select>
-              </Field>
-              <Field label="Tareas habituales">
-                <textarea style={textareaStyle} rows={3} value={tareas} onChange={e => setTareas(e.target.value)} placeholder="Describí las tareas que realizaba habitualmente" />
-              </Field>
-              <div style={col2Grid}>
-                <Field label="Remuneración bruta mensual">
-                  <input style={inputStyle} value={remuneracion} onChange={e => setRemuneracion(e.target.value)} placeholder="Ej: $850.000" />
-                </Field>
-                <Field label="CCT / Convenio colectivo">
-                  <input style={inputStyle} value={cct} onChange={e => setCct(e.target.value)} placeholder="Ej: CCT 260/75" />
-                </Field>
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* Section 3 */}
-          <SectionCard>
-            <SectionHeader num={3} title="Situación registral" />
-            <div style={fieldGap}>
-              <Field label="Estado de aportes">
-                <select style={selectStyle} value={estadoAportes} onChange={e => setEstadoAportes(e.target.value)}>
-                  <option value="">Seleccionar...</option>
-                  <option value="al_dia">Al día</option>
-                  <option value="irregulares">Irregulares</option>
-                  <option value="sin_registracion">Sin registración</option>
-                </select>
-              </Field>
-              <Field label="Fecha de alta AFIP">
-                <input style={inputStyle} type="date" value={fechaAfip} onChange={e => setFechaAfip(e.target.value)} />
-              </Field>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <CheckField
-                  label="El sueldo no coincide con el recibo de sueldo"
-                  checked={sueldoNoCoincide}
-                  onChange={() => setSueldoNoCoincide(v => !v)}
-                />
-                <CheckField
-                  label="La jornada no coincide con lo registrado"
-                  checked={jornadaNoCoincide}
-                  onChange={() => setJornadaNoCoincide(v => !v)}
-                />
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* Section 4 */}
-          <SectionCard>
-            <SectionHeader num={4} title="Notas internas" />
-            <textarea
-              style={{ ...textareaStyle, minHeight: 100 }}
-              rows={5}
-              value={notas}
-              onChange={e => setNotas(e.target.value)}
-              placeholder="Observaciones relevantes para el caso..."
-            />
-          </SectionCard>
+          {/* Nota: datos del trabajo se registrarán al crear el caso (RF-08/RF-09) */}
+          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '12px 16px', fontSize: 12, color: '#92400E', fontFamily: "'Inter', sans-serif" }}>
+            Los datos del trabajo y la situación registral se completan al crear el caso laboral (siguiente paso).
+          </div>
 
         </div>
 
@@ -282,23 +235,26 @@ export default function NuevoClientePage() {
               Guardar cliente
             </div>
             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: '#7B8799', marginTop: 6, marginBottom: 0 }}>
-              Los datos se guardarán de forma segura.
+              Los datos se guardarán de forma segura conforme a la Ley 25.326.
             </p>
             <button
+              onClick={() => void handleGuardar()}
+              disabled={saving}
               style={{
-                width: '100%', height: 44, background: '#1B3A6B', color: '#fff',
+                width: '100%', height: 44, background: saving ? '#7B8799' : '#1B3A6B', color: '#fff',
                 border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                cursor: 'pointer', fontFamily: "'Inter', sans-serif", marginTop: 16,
+                cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif", marginTop: 16,
               }}
             >
-              Guardar cliente
+              {saving ? 'Guardando…' : 'Guardar cliente'}
             </button>
             <button
               onClick={() => navigate('/clientes')}
+              disabled={saving}
               style={{
                 width: '100%', background: '#F2F0EA', color: '#5A6478',
                 border: '1px solid #D8D4CA', borderRadius: 8, padding: '9px 16px',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                fontSize: 13, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
                 fontFamily: "'Inter', sans-serif", marginTop: 8,
               }}
             >
