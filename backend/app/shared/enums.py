@@ -90,17 +90,24 @@ class EstadoBackup(str, enum.Enum):
 # ─────────────────── SQLAlchemy Enum type objects (compartidos) ───────────────
 # Usar estas instancias en mapped_column() para evitar registros duplicados.
 
-rol_usuario_sa = sa.Enum(RolUsuario, name="rol_usuario")
-area_derecho_sa = sa.Enum(AreaDerecho, name="area_derecho")
-fase_caso_sa = sa.Enum(FaseCaso, name="fase_caso")
-tipo_reclamo_art_sa = sa.Enum(TipoReclamoArt, name="tipo_reclamo_art")
-resultado_telegrama_sa = sa.Enum(ResultadoTelegrama, name="resultado_telegrama")
-tipo_comunicacion_telegrama_sa = sa.Enum(
-    TipoComunicacionTelegrama, name="tipo_comunicacion_telegrama"
+# create_type=False: DDL is owned by Alembic migrations, not metadata.create_all()
+rol_usuario_sa = sa.Enum(RolUsuario, name="rol_usuario", create_type=False)
+area_derecho_sa = sa.Enum(AreaDerecho, name="area_derecho", create_type=False)
+fase_caso_sa = sa.Enum(FaseCaso, name="fase_caso", create_type=False)
+tipo_reclamo_art_sa = sa.Enum(TipoReclamoArt, name="tipo_reclamo_art", create_type=False)
+resultado_telegrama_sa = sa.Enum(
+    ResultadoTelegrama, name="resultado_telegrama", create_type=False
 )
-categoria_documento_sa = sa.Enum(CategoriaDocumento, name="categoria_documento")
-formato_documento_sa = sa.Enum(FormatoDocumento, name="formato_documento")
-tipo_comunicacion_sa = sa.Enum(TipoComunicacion, name="tipo_comunicacion")
-estado_comunicacion_sa = sa.Enum(EstadoComunicacion, name="estado_comunicacion")
-tipo_backup_sa = sa.Enum(TipoBackup, name="tipo_backup")
-estado_backup_sa = sa.Enum(EstadoBackup, name="estado_backup")
+tipo_comunicacion_telegrama_sa = sa.Enum(
+    TipoComunicacionTelegrama, name="tipo_comunicacion_telegrama", create_type=False
+)
+categoria_documento_sa = sa.Enum(
+    CategoriaDocumento, name="categoria_documento", create_type=False
+)
+formato_documento_sa = sa.Enum(FormatoDocumento, name="formato_documento", create_type=False)
+tipo_comunicacion_sa = sa.Enum(TipoComunicacion, name="tipo_comunicacion", create_type=False)
+estado_comunicacion_sa = sa.Enum(
+    EstadoComunicacion, name="estado_comunicacion", create_type=False
+)
+tipo_backup_sa = sa.Enum(TipoBackup, name="tipo_backup", create_type=False)
+estado_backup_sa = sa.Enum(EstadoBackup, name="estado_backup", create_type=False)

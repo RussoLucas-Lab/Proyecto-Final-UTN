@@ -28,20 +28,62 @@ Limpia las cookies y **revoca** el refresh token (tabla `refresh_token`); regist
 
 ## Usuarios (solo SOCIO)
 
+> **Auth**: JWT en cookie HttpOnly. Mutaciones protegidas por CSRF double-submit (`X-CSRF-Token`).
+> **RBAC**: `GET` accesible por todo usuario autenticado (RN-08); `POST/PUT/PATCH` exclusivos de SOCIO (RN-07).
+
 ### GET /usuarios
-Lista de usuarios. *(RF-03, RN-07)*
+Lista todos los usuarios del estudio. **200** lista de `UsuarioResponse`. **401** sin sesión. *(RF-03, RN-07, RN-08)*
 
 ### POST /usuarios
+Crea un usuario nuevo. El SOCIO provee la contraseña inicial — **desvío D2** respecto al contrato original (que no incluía `password`): el modelo requiere `password_hash NOT NULL` y no hay flujo de invitación en el MVP.
+
 ```json
-{ "nombre": "María López", "email": "m@estudio.test", "rol": "ABOGADO", "area": "ART", "matricula": "MZA-1234" }
+{
+  "email": "m@estudio.test",
+  "password": "contraseñaInicial",
+  "nombre": "María López",
+  "rol": "ABOGADO",
+  "area": "ART",
+  "matricula": "MZA-1234"
+}
 ```
-**201** → usuario creado. *(RF-03, RN-07)*
+
+> **Validación de `password`**: hoy es solo `min_length=1`. No existe política de complejidad centralizada en el MVP — se reutilizará cuando esté disponible (ver deuda en changemap.md).
+
+**201** → `UsuarioResponse` (sin `password_hash`). **409** email duplicado. **422** payload inválido o ABOGADO sin área. **403** si no es SOCIO. *(RF-03, RN-07)*
 
 ### PUT /usuarios/{id}
-Edita los datos del usuario. *(RF-03)*
+Reemplaza nombre, rol, área y matrícula. No modifica email (inmutable) ni contraseña.
+
+```json
+{ "nombre": "María López", "rol": "ABOGADO", "area": "LABORAL", "matricula": "MZA-9999" }
+```
+
+**200** → `UsuarioResponse`. **404** no encontrado. **422** ABOGADO sin área. **403** si no es SOCIO. *(RF-03)*
 
 ### PATCH /usuarios/{id}
-Activa o desactiva (baja lógica): `{ "activo": false }`. *(RF-03, RN-07)*
+Activa o desactiva (baja lógica). Un SOCIO no puede desactivarse a sí mismo.
+
+```json
+{ "activo": false }
+```
+
+**200** → `UsuarioResponse`. **409** intento de autodesactivación. **404** no encontrado. **403** si no es SOCIO. *(RF-03, RN-07)*
+
+### UsuarioResponse (schema de respuesta)
+```json
+{
+  "id": 3,
+  "email": "m@estudio.test",
+  "nombre": "María López",
+  "rol": "ABOGADO",
+  "area": "ART",
+  "matricula": "MZA-1234",
+  "activo": true,
+  "creado_en": "2026-06-25T10:00:00"
+}
+```
+`password_hash` **nunca** se incluye en ninguna respuesta.
 
 ## Clientes
 

@@ -79,6 +79,10 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            # checkfirst=True makes _on_table_create check if types/tables exist
+            # before creating them — handles container restarts where a partial
+            # migration left enum types committed but alembic_version un-updated.
+            checkfirst=True,
         )
 
         with context.begin_transaction():

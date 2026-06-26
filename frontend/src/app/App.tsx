@@ -18,7 +18,8 @@ const UsuariosPage      = lazy(() => import('../features/usuarios/UsuariosPage')
 const RespaldosPage     = lazy(() => import('../features/respaldos/RespaldosPage'));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <Spinner />;
   return user ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
@@ -35,12 +36,15 @@ const Spinner = () => (
 );
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
   return (
     <Suspense fallback={<Spinner />}>
       <Routes>
-        <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+        <Route
+          path="/login"
+          element={isLoading ? <Spinner /> : user ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+        />
         <Route path="/" element={<RequireAuth><AppShell /></RequireAuth>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard"       element={<DashboardPage />} />

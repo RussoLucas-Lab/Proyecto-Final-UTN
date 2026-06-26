@@ -11,10 +11,20 @@ export default function LoginPage() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [btnHovered, setBtnHovered] = useState(false);
   const [linkHovered, setLinkHovered] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    login({ id: 1, nombre: 'Dr. Martín Suárez', rol: 'SOCIO', iniciales: 'MS' });
-    navigate('/dashboard');
+  const handleLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch {
+      setError('Credenciales inválidas o cuenta inactiva');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -182,6 +192,24 @@ export default function LoginPage() {
           ¿Olvidó su contraseña?
         </a>
 
+        {/* Error message */}
+        {error && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: '10px 14px',
+              borderRadius: 8,
+              background: '#FEF2F2',
+              border: '1px solid #FECACA',
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 13,
+              color: '#B91C1C',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         {/* Spacer */}
         <div style={{ height: 28 }} />
 
@@ -190,21 +218,22 @@ export default function LoginPage() {
           onClick={handleLogin}
           onMouseEnter={() => setBtnHovered(true)}
           onMouseLeave={() => setBtnHovered(false)}
+          disabled={loading}
           style={{
             width: '100%',
             height: 46,
-            background: btnHovered ? '#162F59' : '#1B3A6B',
+            background: loading ? '#4A6A9B' : (btnHovered ? '#162F59' : '#1B3A6B'),
             color: '#FFFFFF',
             border: 'none',
             borderRadius: 8,
             fontFamily: "'Inter', sans-serif",
             fontWeight: 600,
             fontSize: 15,
-            cursor: 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             transition: 'background 0.15s ease',
           }}
         >
-          Ingresar
+          {loading ? 'Ingresando...' : 'Ingresar'}
         </button>
       </div>
 

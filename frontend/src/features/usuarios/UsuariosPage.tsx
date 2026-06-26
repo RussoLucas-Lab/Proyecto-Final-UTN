@@ -1,374 +1,241 @@
-import { useState } from 'react';
+/**
+ * Página de gestión de usuarios — solo SOCIO (RF-03, RN-07).
+ *
+ * Muestra el listado de usuarios (nombre, email, rol, área, matrícula, estado)
+ * con acciones de alta, edición y toggle de activación.
+ * La ruta está protegida con <RequireSocio> en App.tsx; esta página asume
+ * que el usuario logueado es SOCIO.
+ *
+ * Mensajes en español (AR) y manejo de errores de API (409/403/422).
+ */
+import React, { useState } from 'react';
+import type { Area, Rol } from '../../shared/types';
+import UsuarioForm from './components/UsuarioForm';
+import { useUsuarios } from './hooks/useUsuarios';
+import type { Usuario, UsuarioCreate, UsuarioUpdate } from './types';
 
-interface Usuario {
-  id: number;
-  nombre: string;
-  correo: string;
-  rol: 'Socio' | 'Abogado';
-  area: 'Laboral' | 'ART' | null;
-  matricula: string | null;
-  estado: 'Activo' | 'Inactivo';
-}
-
-const mockUsuarios: Usuario[] = [
-  { id: 1, nombre: 'Dr. Martín Suárez', correo: 'msuarez@iuris.com.ar', rol: 'Socio', area: null, matricula: 'MP 1234', estado: 'Activo' },
-  { id: 2, nombre: 'Dra. Laura Vega', correo: 'lvega@iuris.com.ar', rol: 'Abogado', area: 'Laboral', matricula: 'MP 5678', estado: 'Activo' },
-  { id: 3, nombre: 'Dr. Pablo Rossi', correo: 'prossi@iuris.com.ar', rol: 'Abogado', area: 'ART', matricula: 'MP 9012', estado: 'Activo' },
-  { id: 4, nombre: 'Lic. Ana Torres', correo: 'atorres@iuris.com.ar', rol: 'Abogado', area: 'Laboral', matricula: 'MP 3456', estado: 'Activo' },
-  { id: 5, nombre: 'Sr. Diego López', correo: 'dlopez@iuris.com.ar', rol: 'Abogado', area: 'ART', matricula: null, estado: 'Inactivo' },
-  { id: 6, nombre: 'Sra. María Gómez', correo: 'mgomez@iuris.com.ar', rol: 'Abogado', area: 'Laboral', matricula: null, estado: 'Activo' },
-];
-
-function getInitials(nombre: string): string {
-  const parts = nombre.replace(/^(Dr\.|Dra\.|Lic\.|Sr\.|Sra\.)\s+/, '').split(' ');
-  return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase();
-}
-
-function getAvatarBg(area: 'Laboral' | 'ART' | null, rol: 'Socio' | 'Abogado'): string {
-  if (area === 'ART') return '#E3F5F5';
-  return '#E8EDF8';
-}
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: 11,
-  fontFamily: 'Inter, sans-serif',
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  color: '#5A6478',
-  marginBottom: 5,
-  letterSpacing: '0.04em',
+const ROL_LABELS: Record<Rol, string> = {
+  SOCIO: 'Socio',
+  ABOGADO: 'Abogado',
 };
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  height: 40,
-  border: '1.5px solid #E5E2D8',
-  borderRadius: 7,
-  background: '#FAFAF7',
-  padding: '0 12px',
-  fontSize: 13,
-  fontFamily: 'Inter, sans-serif',
-  color: '#131C2E',
-  boxSizing: 'border-box',
-  outline: 'none',
+const AREA_LABELS: Record<Area, string> = {
+  LABORAL: 'Laboral',
+  ART: 'ART',
 };
 
-const btnPrimary: React.CSSProperties = {
-  background: '#1B3A6B',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 8,
-  padding: '9px 16px',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  fontFamily: 'Inter, sans-serif',
-};
-
-const btnSecondary: React.CSSProperties = {
-  background: '#F2F0EA',
-  color: '#5A6478',
-  border: '1px solid #D8D4CA',
-  borderRadius: 8,
-  padding: '9px 16px',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  fontFamily: 'Inter, sans-serif',
-};
-
-const colHeaders = ['Nombre', 'Correo', 'Rol', 'Área', 'Matrícula', 'Estado', 'Acciones'];
+type ModalState =
+  | { tipo: 'cerrado' }
+  | { tipo: 'alta' }
+  | { tipo: 'edicion'; usuario: Usuario };
 
 export default function UsuariosPage() {
-  const [showForm, setShowForm] = useState(false);
-  const [nombre, setNombre] = useState('');
-  const [correo, setCorreo] = useState('');
-  const [matricula, setMatricula] = useState('');
-  const [rol, setRol] = useState<'Socio' | 'Abogado'>('Abogado');
-  const [area, setArea] = useState<'Laboral' | 'ART' | ''>('');
+  const { usuarios, isLoading, error, crear, editar, cambiarActivacion } = useUsuarios();
+  const [modal, setModal] = useState<ModalState>({ tipo: 'cerrado' });
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
-  function handleCancelar() {
-    setShowForm(false);
-    setNombre('');
-    setCorreo('');
-    setMatricula('');
-    setRol('Abogado');
-    setArea('');
+  async function handleGuardar(datos: UsuarioCreate | UsuarioUpdate) {
+    if (modal.tipo === 'alta') {
+      await crear(datos as UsuarioCreate);
+    } else if (modal.tipo === 'edicion') {
+      await editar(modal.usuario.id, datos as UsuarioUpdate);
+    }
+    setModal({ tipo: 'cerrado' });
+  }
+
+  async function handleToggleActivacion(usuario: Usuario) {
+    setTogglingId(usuario.id);
+    setToggleError(null);
+    try {
+      await cambiarActivacion(usuario.id, { activo: !usuario.activo });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('409')) {
+        setToggleError('No podés desactivar tu propia cuenta.');
+      } else if (msg.includes('403')) {
+        setToggleError('Sin permiso para realizar esta acción.');
+      } else {
+        setToggleError('Error al cambiar el estado. Intentá de nuevo.');
+      }
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   return (
-    <div style={{ fontFamily: 'Inter, sans-serif', color: '#131C2E', padding: '32px 36px', maxWidth: 1100 }}>
-      {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+    <div>
+      {/* Encabezado */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 26, color: '#131C2E', margin: 0, lineHeight: 1.2 }}>
-            Usuarios
-          </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#7B8799', fontFamily: 'Inter, sans-serif' }}>
-            Gestión de accesos del estudio
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#131C2E' }}>Usuarios</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#7B8799' }}>
+            Gestión de acceso al sistema — solo socios
           </p>
         </div>
         <button
-          style={btnPrimary}
-          onClick={() => setShowForm(v => !v)}
+          onClick={() => setModal({ tipo: 'alta' })}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '9px 18px', borderRadius: 8, border: 'none',
+            background: '#1B3A6B', color: 'white', fontSize: 13,
+            fontWeight: 600, cursor: 'pointer',
+          }}
         >
-          + Nuevo usuario
+          <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
+          Nuevo usuario
         </button>
       </div>
 
-      {/* Users table card */}
-      <div style={{
-        background: '#FFFFFF',
-        border: '1px solid #E5E2D8',
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginTop: 24,
-      }}>
-        {/* Table header */}
+      {/* Error de toggle */}
+      {toggleError && (
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: '200px 220px 110px 110px 120px 100px 160px',
-          background: '#FAFAF7',
-          borderBottom: '2px solid #E5E2D8',
+          background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8,
+          padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#991B1B',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          {colHeaders.map(h => (
-            <div key={h} style={{
-              padding: '11px 16px',
-              fontSize: 11,
-              fontFamily: 'Inter, sans-serif',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              color: '#7B8799',
-              letterSpacing: '0.04em',
-            }}>
-              {h}
-            </div>
-          ))}
-        </div>
-
-        {/* Rows */}
-        {mockUsuarios.map((u, idx) => (
-          <div
-            key={u.id}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '200px 220px 110px 110px 120px 100px 160px',
-              borderBottom: idx < mockUsuarios.length - 1 ? '1px solid #F2F0EA' : 'none',
-              alignItems: 'center',
-            }}
+          {toggleError}
+          <button
+            onClick={() => setToggleError(null)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991B1B', fontSize: 16 }}
           >
-            {/* Nombre */}
-            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: getAvatarBg(u.area, u.rol),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 11,
-                fontWeight: 700,
-                color: u.area === 'ART' ? '#0B7285' : '#1B3A6B',
-                flexShrink: 0,
-                fontFamily: 'Inter, sans-serif',
-              }}>
-                {getInitials(u.nombre)}
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#131C2E', fontFamily: 'Inter, sans-serif' }}>
-                {u.nombre}
-              </span>
-            </div>
+            ×
+          </button>
+        </div>
+      )}
 
-            {/* Correo */}
-            <div style={{ padding: '12px 16px', fontSize: 13, color: '#5A6478', fontFamily: 'Inter, sans-serif' }}>
-              {u.correo}
-            </div>
+      {/* Error de carga */}
+      {error && (
+        <div style={{
+          background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8,
+          padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#991B1B',
+        }}>
+          {error}
+        </div>
+      )}
 
-            {/* Rol badge */}
-            <div style={{ padding: '12px 16px' }}>
-              <span style={{
-                display: 'inline-block',
-                padding: '3px 9px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                fontFamily: 'Inter, sans-serif',
-                background: u.rol === 'Socio' ? '#FEF3E2' : '#EDE9F7',
-                color: u.rol === 'Socio' ? '#B45309' : '#5B4A8A',
-              }}>
-                {u.rol}
-              </span>
-            </div>
-
-            {/* Área badge */}
-            <div style={{ padding: '12px 16px' }}>
-              {u.area ? (
-                <span style={{
-                  display: 'inline-block',
-                  padding: '3px 9px',
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  fontFamily: 'Inter, sans-serif',
-                  background: u.area === 'Laboral' ? '#E8EDF8' : '#E3F5F5',
-                  color: u.area === 'Laboral' ? '#1B3A6B' : '#0B7285',
-                }}>
-                  {u.area}
-                </span>
-              ) : (
-                <span style={{ color: '#7B8799', fontSize: 13, fontFamily: 'Inter, sans-serif' }}>—</span>
-              )}
-            </div>
-
-            {/* Matrícula */}
-            <div style={{ padding: '12px 16px' }}>
-              {u.matricula ? (
-                <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#131C2E' }}>{u.matricula}</span>
-              ) : (
-                <span style={{ color: '#7B8799', fontSize: 13, fontFamily: 'Inter, sans-serif' }}>—</span>
-              )}
-            </div>
-
-            {/* Estado badge */}
-            <div style={{ padding: '12px 16px' }}>
-              <span style={{
-                display: 'inline-block',
-                padding: '3px 9px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                fontFamily: 'Inter, sans-serif',
-                background: u.estado === 'Activo' ? '#E6F4EE' : '#F2F0EA',
-                color: u.estado === 'Activo' ? '#1A7A4A' : '#7B8799',
-              }}>
-                {u.estado}
-              </span>
-            </div>
-
-            {/* Acciones */}
-            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button style={{
-                ...btnSecondary,
-                fontSize: 12,
-                padding: '6px 12px',
-              }}>
-                Editar
-              </button>
-              {u.estado === 'Activo' && (
-                <button style={{
-                  background: '#FEE4E2',
-                  color: '#C9423A',
-                  border: '1px solid #F5C2C0',
-                  borderRadius: 8,
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'Inter, sans-serif',
-                }}>
-                  Desactivar
-                </button>
-              )}
-            </div>
+      {/* Tabla de usuarios */}
+      <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E9E6DE', overflow: 'hidden' }}>
+        {isLoading ? (
+          <div style={{ padding: '48px 24px', textAlign: 'center', color: '#9BA8B8', fontSize: 14 }}>
+            Cargando usuarios…
           </div>
-        ))}
+        ) : usuarios.length === 0 ? (
+          <div style={{ padding: '48px 24px', textAlign: 'center', color: '#9BA8B8', fontSize: 14 }}>
+            No hay usuarios registrados todavía.
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1.5px solid #E9E6DE' }}>
+                {['Nombre', 'Email', 'Rol', 'Área', 'Matrícula', 'Estado', 'Acciones'].map((col) => (
+                  <th
+                    key={col}
+                    style={{
+                      padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700,
+                      color: '#7B8799', textTransform: 'uppercase', letterSpacing: '0.5px',
+                    }}
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {usuarios.map((u) => (
+                <tr
+                  key={u.id}
+                  style={{
+                    borderBottom: '1px solid #F0EDE6',
+                    background: u.activo ? 'white' : '#FAFAF7',
+                    opacity: u.activo ? 1 : 0.7,
+                  }}
+                >
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#131C2E' }}>
+                    {u.nombre}
+                  </td>
+                  <td style={{ padding: '12px 16px', color: '#4B5563' }}>{u.email}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{
+                      display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 11,
+                      fontWeight: 700, letterSpacing: '0.3px',
+                      background: u.rol === 'SOCIO' ? '#EFF6FF' : '#F0FDF4',
+                      color: u.rol === 'SOCIO' ? '#1D4ED8' : '#15803D',
+                    }}>
+                      {ROL_LABELS[u.rol]}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px', color: '#4B5563' }}>
+                    {u.area ? AREA_LABELS[u.area] : '—'}
+                  </td>
+                  <td style={{ padding: '12px 16px', color: '#4B5563' }}>
+                    {u.matricula ?? '—'}
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{
+                      display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                      background: u.activo ? '#DCFCE7' : '#FEE2E2',
+                      color: u.activo ? '#166534' : '#991B1B',
+                    }}>
+                      {u.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => setModal({ tipo: 'edicion', usuario: u })}
+                        style={{
+                          padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                          border: '1.5px solid #E5E2D8', background: 'white', cursor: 'pointer',
+                          color: '#1B3A6B',
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => void handleToggleActivacion(u)}
+                        disabled={togglingId === u.id}
+                        style={{
+                          padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                          border: 'none', cursor: togglingId === u.id ? 'not-allowed' : 'pointer',
+                          background: u.activo ? '#FEE2E2' : '#DCFCE7',
+                          color: u.activo ? '#991B1B' : '#166534',
+                          opacity: togglingId === u.id ? 0.6 : 1,
+                        }}
+                      >
+                        {togglingId === u.id
+                          ? '…'
+                          : u.activo
+                          ? 'Desactivar'
+                          : 'Reactivar'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Alta de nuevo usuario form */}
-      {showForm && (
-        <div style={{
-          background: '#FFFFFF',
-          border: '1px solid #E5E2D8',
-          borderRadius: 12,
-          padding: 22,
-          marginTop: 20,
-        }}>
-          <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'Inter, sans-serif', color: '#131C2E', marginBottom: 16 }}>
-            Alta de nuevo usuario
-          </div>
-
+      {/* Modal de alta/edición */}
+      {modal.tipo !== 'cerrado' && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setModal({ tipo: 'cerrado' }); }}
+        >
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: 16,
+            background: 'white', borderRadius: 12, padding: '28px 32px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)', minWidth: 400, maxWidth: 480,
           }}>
-            {/* Nombre completo */}
-            <div>
-              <label style={labelStyle}>Nombre completo</label>
-              <input
-                type="text"
-                style={inputStyle}
-                placeholder="Ej. Dr. Juan García"
-                value={nombre}
-                onChange={e => setNombre(e.target.value)}
-              />
-            </div>
-
-            {/* Correo electrónico */}
-            <div>
-              <label style={labelStyle}>Correo electrónico</label>
-              <input
-                type="email"
-                style={inputStyle}
-                placeholder="correo@iuris.com.ar"
-                value={correo}
-                onChange={e => setCorreo(e.target.value)}
-              />
-            </div>
-
-            {/* Matrícula */}
-            <div>
-              <label style={labelStyle}>Matrícula <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 10 }}>(opcional)</span></label>
-              <input
-                type="text"
-                style={inputStyle}
-                placeholder="MP 0000"
-                value={matricula}
-                onChange={e => setMatricula(e.target.value)}
-              />
-            </div>
-
-            {/* Rol */}
-            <div>
-              <label style={labelStyle}>Rol</label>
-              <select
-                style={{ ...inputStyle, cursor: 'pointer' }}
-                value={rol}
-                onChange={e => setRol(e.target.value as 'Socio' | 'Abogado')}
-              >
-                <option value="Socio">Socio</option>
-                <option value="Abogado">Abogado</option>
-              </select>
-            </div>
-
-            {/* Área */}
-            <div>
-              <label style={labelStyle}>Área</label>
-              <select
-                style={{ ...inputStyle, cursor: 'pointer' }}
-                value={area}
-                onChange={e => setArea(e.target.value as 'Laboral' | 'ART' | '')}
-              >
-                <option value="">—</option>
-                <option value="Laboral">Laboral</option>
-                <option value="ART">ART</option>
-              </select>
-            </div>
-
-            {/* Empty cell */}
-            <div />
-          </div>
-
-          {/* Button row */}
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button style={btnPrimary}>
-              Crear usuario
-            </button>
-            <button style={btnSecondary} onClick={handleCancelar}>
-              Cancelar
-            </button>
+            <UsuarioForm
+              usuario={modal.tipo === 'edicion' ? modal.usuario : undefined}
+              onGuardar={handleGuardar}
+              onCancelar={() => setModal({ tipo: 'cerrado' })}
+            />
           </div>
         </div>
       )}

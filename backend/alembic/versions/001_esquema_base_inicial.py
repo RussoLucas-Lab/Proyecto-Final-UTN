@@ -40,64 +40,72 @@ depends_on: Union[str, Sequence[str], None] = None
 
 # ─────────────────── definiciones de enums (para upgrade/downgrade) ───────────
 
-def _create_enums(bind) -> None:
-    """Crea los 12 tipos ENUM de PostgreSQL con checkfirst=True."""
-    sa.Enum("SOCIO", "ABOGADO", name="rol_usuario").create(bind, checkfirst=True)
-    sa.Enum("LABORAL", "ART", name="area_derecho").create(bind, checkfirst=True)
-    sa.Enum("EXTRAJUDICIAL", "JUDICIAL", name="fase_caso").create(bind, checkfirst=True)
-    sa.Enum("ACCIDENTE", "ENFERMEDAD", name="tipo_reclamo_art").create(bind, checkfirst=True)
-    sa.Enum(
+def _create_enum(name: str, values: list) -> None:
+    """Crea un tipo ENUM de PostgreSQL de forma idempotente via DO block.
+
+    Usar op.execute() en lugar de sa.Enum.create() asegura que el DDL corra
+    dentro de la transacción de Alembic. Con sa.Enum.create(bind) en
+    SQLAlchemy 2.x el DDL puede auto-commitearse, dejando los tipos creados
+    si la migración falla después — lo que rompe el re-intento.
+    """
+    values_sql = ", ".join(f"'{v}'" for v in values)
+    op.execute(sa.text(
+        f"DO $$ BEGIN "
+        f"CREATE TYPE {name} AS ENUM ({values_sql}); "
+        f"EXCEPTION WHEN duplicate_object THEN null; "
+        f"END $$;"
+    ))
+
+
+def _drop_enum(name: str) -> None:
+    """Elimina un tipo ENUM de PostgreSQL si existe."""
+    op.execute(sa.text(f"DROP TYPE IF EXISTS {name}"))
+
+
+def _create_enums() -> None:
+    _create_enum("rol_usuario", ["SOCIO", "ABOGADO"])
+    _create_enum("area_derecho", ["LABORAL", "ART"])
+    _create_enum("fase_caso", ["EXTRAJUDICIAL", "JUDICIAL"])
+    _create_enum("tipo_reclamo_art", ["ACCIDENTE", "ENFERMEDAD"])
+    _create_enum("resultado_telegrama", [
         "PENDIENTE", "ENTREGADO", "RECHAZADO", "EN_SUCURSAL",
         "DOMICILIO_INEXISTENTE", "CERRADO",
-        name="resultado_telegrama",
-    ).create(bind, checkfirst=True)
-    sa.Enum(
-        "RENUNCIA", "AUSENCIA", "OTRO",
-        name="tipo_comunicacion_telegrama",
-    ).create(bind, checkfirst=True)
-    sa.Enum(
+    ])
+    _create_enum("tipo_comunicacion_telegrama", ["RENUNCIA", "AUSENCIA", "OTRO"])
+    _create_enum("categoria_documento", [
         "DNI", "BONO_SUELDO", "HISTORIA_CLINICA", "ACTA_NOTARIAL", "PODER", "OTRO",
-        name="categoria_documento",
-    ).create(bind, checkfirst=True)
-    sa.Enum("PDF", "DOC", "IMAGEN", name="formato_documento").create(bind, checkfirst=True)
-    sa.Enum(
-        "ACTUALIZACION_AUTOMATICA", "MANUAL",
-        name="tipo_comunicacion",
-    ).create(bind, checkfirst=True)
-    sa.Enum(
-        "PENDIENTE_REVISION", "APROBADO", "DESCARTADO",
-        name="estado_comunicacion",
-    ).create(bind, checkfirst=True)
-    sa.Enum("AUTOMATICO", "MANUAL", name="tipo_backup").create(bind, checkfirst=True)
-    sa.Enum("OK", "ERROR", name="estado_backup").create(bind, checkfirst=True)
+    ])
+    _create_enum("formato_documento", ["PDF", "DOC", "IMAGEN"])
+    _create_enum("tipo_comunicacion", ["ACTUALIZACION_AUTOMATICA", "MANUAL"])
+    _create_enum("estado_comunicacion", ["PENDIENTE_REVISION", "APROBADO", "DESCARTADO"])
+    _create_enum("tipo_backup", ["AUTOMATICO", "MANUAL"])
+    _create_enum("estado_backup", ["OK", "ERROR"])
 
 
-def _drop_enums(bind) -> None:
-    """Elimina los 12 tipos ENUM de PostgreSQL."""
-    sa.Enum(name="estado_backup").drop(bind, checkfirst=True)
-    sa.Enum(name="tipo_backup").drop(bind, checkfirst=True)
-    sa.Enum(name="estado_comunicacion").drop(bind, checkfirst=True)
-    sa.Enum(name="tipo_comunicacion").drop(bind, checkfirst=True)
-    sa.Enum(name="formato_documento").drop(bind, checkfirst=True)
-    sa.Enum(name="categoria_documento").drop(bind, checkfirst=True)
-    sa.Enum(name="tipo_comunicacion_telegrama").drop(bind, checkfirst=True)
-    sa.Enum(name="resultado_telegrama").drop(bind, checkfirst=True)
-    sa.Enum(name="tipo_reclamo_art").drop(bind, checkfirst=True)
-    sa.Enum(name="fase_caso").drop(bind, checkfirst=True)
-    sa.Enum(name="area_derecho").drop(bind, checkfirst=True)
-    sa.Enum(name="rol_usuario").drop(bind, checkfirst=True)
+def _drop_enums() -> None:
+    _drop_enum("estado_backup")
+    _drop_enum("tipo_backup")
+    _drop_enum("estado_comunicacion")
+    _drop_enum("tipo_comunicacion")
+    _drop_enum("formato_documento")
+    _drop_enum("categoria_documento")
+    _drop_enum("tipo_comunicacion_telegrama")
+    _drop_enum("resultado_telegrama")
+    _drop_enum("tipo_reclamo_art")
+    _drop_enum("fase_caso")
+    _drop_enum("area_derecho")
+    _drop_enum("rol_usuario")
 
 
 # ────────────────────────────────── upgrade ───────────────────────────────────
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
+    # Los 12 enums se crean automáticamente por Alembic via _on_table_create
+    # al procesar la primera tabla que usa cada tipo (memo-based dedup).
+    # checkfirst=True en env.py garantiza idempotencia ante reinicios.
 
-    # ── 1. Crear los 12 enums ───────────────────────────────────────────────
-    _create_enums(bind)
-
-    # ── 2. Tablas en orden de dependencias FK ──────────────────────────────
+    # ── Tablas en orden de dependencias FK ─────────────────────────────────
 
     # 2.1 usuario — sin dependencias externas
     op.create_table(
@@ -116,7 +124,7 @@ def upgrade() -> None:
             sa.Enum(
                 "SOCIO", "ABOGADO",
                 name="rol_usuario",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -125,7 +133,7 @@ def upgrade() -> None:
             sa.Enum(
                 "LABORAL", "ART",
                 name="area_derecho",
-                create_type=False,
+
             ),
             nullable=True,
             comment="Área del profesional. NULL para socios (transversales)",
@@ -183,7 +191,7 @@ def upgrade() -> None:
             sa.Enum(
                 "LABORAL", "ART",
                 name="area_derecho",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -192,7 +200,7 @@ def upgrade() -> None:
             sa.Enum(
                 "EXTRAJUDICIAL", "JUDICIAL",
                 name="fase_caso",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -242,7 +250,7 @@ def upgrade() -> None:
             sa.Enum(
                 "LABORAL", "ART",
                 name="area_derecho",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -251,7 +259,7 @@ def upgrade() -> None:
             sa.Enum(
                 "ACCIDENTE", "ENFERMEDAD",
                 name="tipo_reclamo_art",
-                create_type=False,
+
             ),
             nullable=True,
             comment="Solo ART: accidente o enfermedad. NULL en Laboral",
@@ -428,7 +436,7 @@ def upgrade() -> None:
                 "PENDIENTE", "ENTREGADO", "RECHAZADO", "EN_SUCURSAL",
                 "DOMICILIO_INEXISTENTE", "CERRADO",
                 name="resultado_telegrama",
-                create_type=False,
+
             ),
             nullable=False,
             server_default=sa.text("'PENDIENTE'"),
@@ -438,7 +446,7 @@ def upgrade() -> None:
             sa.Enum(
                 "RENUNCIA", "AUSENCIA", "OTRO",
                 name="tipo_comunicacion_telegrama",
-                create_type=False,
+
             ),
             nullable=False,
             server_default=sa.text("'OTRO'"),
@@ -485,7 +493,7 @@ def upgrade() -> None:
                 "DNI", "BONO_SUELDO", "HISTORIA_CLINICA", "ACTA_NOTARIAL",
                 "PODER", "OTRO",
                 name="categoria_documento",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -494,7 +502,7 @@ def upgrade() -> None:
             sa.Enum(
                 "PDF", "DOC", "IMAGEN",
                 name="formato_documento",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -579,7 +587,7 @@ def upgrade() -> None:
             sa.Enum(
                 "ACTUALIZACION_AUTOMATICA", "MANUAL",
                 name="tipo_comunicacion",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -588,7 +596,7 @@ def upgrade() -> None:
             sa.Enum(
                 "PENDIENTE_REVISION", "APROBADO", "DESCARTADO",
                 name="estado_comunicacion",
-                create_type=False,
+
             ),
             nullable=False,
             server_default=sa.text("'PENDIENTE_REVISION'"),
@@ -659,7 +667,7 @@ def upgrade() -> None:
             sa.Enum(
                 "AUTOMATICO", "MANUAL",
                 name="tipo_backup",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -668,7 +676,7 @@ def upgrade() -> None:
             sa.Enum(
                 "OK", "ERROR",
                 name="estado_backup",
-                create_type=False,
+
             ),
             nullable=False,
         ),
@@ -680,8 +688,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-
     # ── 1. Drop tablas en orden inverso de dependencias FK ─────────────────
     op.drop_table("backup")
     op.drop_index("ix_refresh_token_usuario_id", table_name="refresh_token")
@@ -709,4 +715,4 @@ def downgrade() -> None:
     op.drop_table("usuario")
 
     # ── 2. Drop enums (después de las tablas que los usan) ─────────────────
-    _drop_enums(bind)
+    _drop_enums()

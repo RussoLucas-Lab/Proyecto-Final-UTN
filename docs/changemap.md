@@ -42,7 +42,7 @@
 
 | ID spec | Funcionalidad | Capa | Feature | Prioridad | Estado | Rama/PR | Notas |
 |---------|---------------|------|---------|-----------|--------|---------|-------|
-| RF-03 | ABM de usuarios (alta / edición / desactivación) — solo SOCIO | backend·frontend | usuarios | P0 | 🔲 | — | RN-07. Endpoints `GET/POST /usuarios`, `PUT/PATCH /usuarios/{id}` en `contratos-api.md`; UC-13 en `casos-de-uso.md`. |
+| RF-03 | ABM de usuarios (alta / edición / desactivación) — solo SOCIO | backend·frontend | usuarios | P0 | ✅ | `master` (change `usuarios`) | RN-07. Implementado: `backend/app/features/usuarios/` (schemas, service, router), tests en `tests/features/usuarios/`. Frontend: `frontend/src/features/usuarios/` (types, api, hook, form, page). Desvío D2: `POST /usuarios` acepta `password` — actualizado `contratos-api.md`. Deuda: complejidad de password pendiente. |
 
 ### clientes
 
@@ -112,6 +112,7 @@
 | 2026-06-25 | Change `esqueleto-plataforma` (RNF-07): esqueleto del monorepo feature-first. Creados `backend/app/` (main.py, core/, shared/, features/), `backend/requirements.txt`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` (4 servicios, red privada, volúmenes nombrados), `.env.example` con activas + placeholders. `GET /health` implementado y verificado localmente (200 `{"status":"UP"}`). Smoke test Docker pendiente de ejecución manual. | RNF-07, RNF-13 | Claude Code |
 | 2026-06-25 | Change `migraciones-esquema-base` (RNF-09): SQLAlchemy 2.x + Alembic instalados. Infraestructura transversal (`core/db_base.py`, `core/database.py`, `core/models_registry.py`, `shared/enums.py`). 13 modelos ORM en `features/*/models.py`. Migración inicial `001_esquema_base_inicial.py` con 12 enums y 13 tablas en orden FK correcto. `entrypoint.sh` en Dockerfile ejecuta `alembic upgrade head` antes de Uvicorn. `depends_on: service_healthy` ya configurado. Sin seed (próximo change). | RNF-09, ADR-0009 | Claude Code |
 | 2026-06-25 | Change `seed-ciclo-de-vida` (ADR-0008, RN-04): seed del ciclo de vida depurado y anclado a la spec. `seed_etapas.sql` (canónico) y `etapas_seed_data.py` actualizados: citas reemplazadas (INFORME→docs/), índice redundante `ux_etapa_area_nombre` eliminado, encabezado con orden de ejecución. Tests en `backend/tests/features/casos/test_seed_etapas.py`: conteos (18/19), idempotencia, terminalidad, coherencia del grafo, guardrail sin enums hardcodeados. Infraestructura de tests creada (`tests/`, `conftest.py`, `requirements-dev.txt`). Verificación con DB live pendiente de ejecución manual (tasks 5.1/5.2). | ADR-0008, RN-04, RN-09 | Claude Code |
+| 2026-06-26 | Change `usuarios` (RF-03, RN-07): ABM de usuarios implementado. Backend: `features/usuarios/` (schemas, service, router) con CSRF, RBAC SOCIO, rate limiting 100/min, baja lógica, autodesactivación prohibida. Tests: 29 casos en `tests/features/usuarios/`. Frontend: `features/usuarios/` (types, api, hook, form, page) con modal alta/edición y toggle. Ruta `/usuarios` ya existía protegida con `RequireSocio`. Desvío D2 registrado (ver debajo). Deuda de complejidad de password registrada. | RF-03, RN-07, UC-13, `04-api/contratos-api.md` | Claude Code |
 
 ---
 
@@ -123,7 +124,13 @@
 
 | Fecha | Funcionalidad | Spec afectada | Qué se desvía y por qué | ADR / spec actualizada | Estado |
 |-------|---------------|---------------|-------------------------|------------------------|--------|
-| — | — | — | (sin desvíos: aún no hay código) | — | — |
+| 2026-06-26 | RF-03 — `POST /usuarios` (D2) | `04-api/contratos-api.md` | El contrato original no incluía `password` en el body. El modelo exige `password_hash NOT NULL` y no hay flujo de invitación por email en el MVP. Solución: el SOCIO provee la contraseña inicial en el alta. | `04-api/contratos-api.md` actualizado en el mismo PR (sección Usuarios). | ✅ Resuelto |
+
+### Deudas técnicas registradas
+
+| Fecha | Feature | Deuda | Resolución propuesta |
+|-------|---------|-------|---------------------|
+| 2026-06-26 | usuarios (RF-03) | No existe validación centralizada de complejidad de contraseña. `POST /usuarios` acepta `password` con `min_length=1` únicamente (igual que `LoginRequest` en auth). | Cuando se implemente registro/cambio de contraseña self-service, extraer la validación de complejidad a un validador compartido en `core/` y reutilizarlo en `usuarios`. NO inventar regla ad-hoc hasta entonces. |
 
 ---
 

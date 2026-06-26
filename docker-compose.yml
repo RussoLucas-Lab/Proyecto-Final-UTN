@@ -14,7 +14,9 @@ services:
     networks:
       - iuris_net
     environment:
-      - VITE_API_URL=http://localhost:8000
+      # En Docker el backend está en la red interna como "backend:8000"
+      # (localhost apuntaría al propio contenedor frontend)
+      - VITE_API_URL=http://backend:8000
       - CI=true
     restart: unless-stopped
 
