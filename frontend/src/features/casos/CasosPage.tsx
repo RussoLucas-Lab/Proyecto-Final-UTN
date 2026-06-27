@@ -303,10 +303,10 @@ export default function CasosPage() {
                             fontFamily: 'Inter, sans-serif',
                           }}
                         >
-                          {iniciales(`C${caso.cliente_id}`)}
+                          {iniciales(caso.cliente_nombre ?? undefined)}
                         </div>
                         <span style={{ fontSize: 13, fontWeight: 500, color: '#131C2E' }}>
-                          Cliente #{caso.cliente_id}
+                          {caso.cliente_nombre ?? `Cliente #${caso.cliente_id}`}
                         </span>
                       </div>
                     </td>
@@ -328,7 +328,7 @@ export default function CasosPage() {
                     {/* Etapa */}
                     <td style={{ padding: '12px 16px' }}>
                       <Badge bg={areaBadge.bg} color={areaBadge.color}>
-                        Etapa {caso.etapa_actual_id}
+                        {caso.etapa_actual_nombre ?? `Etapa ${caso.etapa_actual_id}`}
                       </Badge>
                     </td>
 

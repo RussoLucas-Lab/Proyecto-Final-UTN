@@ -50,11 +50,13 @@ export interface FichaLaboral {
 export interface Caso {
   id: number;
   cliente_id: number;
+  cliente_nombre: string | null;
   abogado_responsable_id: number;
   area: AreaDerecho;
   tipo_reclamo: TipoReclamoArt | null;
   codigo_expediente: string | null;
   etapa_actual_id: number;
+  etapa_actual_nombre: string | null;
   fecha_inicio: string | null;
   observaciones: string | null;
   creado_en: string;

@@ -11,12 +11,8 @@ import * as casosApi from './api';
 import type { AreaDerecho, TipoReclamoArt } from './types';
 import { listar as listarClientes } from '../clientes/api';
 import type { Cliente } from '../clientes/types';
-
-const MOCK_ABOGADOS = [
-  { id: 1, label: 'Dr. Martín Suárez (Socio)' },
-  { id: 2, label: 'Dra. Laura Vega (Laboral)' },
-  { id: 3, label: 'Dr. Pablo Rossi (ART)' },
-];
+import { listar as listarUsuarios } from '../usuarios/api';
+import type { Usuario } from '../usuarios/types';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -61,7 +57,8 @@ export default function NuevoCasoPage() {
   const [buscando, setBuscando] = useState(false);
   const [area, setArea] = useState<AreaDerecho | null>(null);
   const [tipoReclamo, setTipoReclamo] = useState<TipoReclamoArt | null>(null);
-  const [abogadoId, setAbogadoId] = useState<number>(MOCK_ABOGADOS[0].id);
+  const [abogadoId, setAbogadoId] = useState<number | null>(null);
+  const [abogados, setAbogados] = useState<Usuario[]>([]);
   const [expediente, setExpediente] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
@@ -76,6 +73,16 @@ export default function NuevoCasoPage() {
   }
 
   useEffect(() => {
+    listarUsuarios()
+      .then((usuarios) => {
+        const activos = usuarios.filter((u) => u.activo);
+        setAbogados(activos);
+        if (activos.length > 0) setAbogadoId(activos[0].id);
+      })
+      .catch(() => setAbogados([]));
+  }, []);
+
+  useEffect(() => {
     if (!searchQuery.trim()) { setResultados([]); return; }
     const timer = setTimeout(() => {
       setBuscando(true);
@@ -87,14 +94,15 @@ export default function NuevoCasoPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const abogadoLabel = MOCK_ABOGADOS.find((a) => a.id === abogadoId)?.label ?? '—';
+  const abogadoLabel = abogados.find((a) => a.id === abogadoId)?.nombre ?? '—';
   const canCreate =
     clienteSeleccionado !== null &&
     area !== null &&
+    abogadoId !== null &&
     (area !== 'ART' || tipoReclamo !== null);
 
   async function handleCrear() {
-    if (!clienteSeleccionado || !area) return;
+    if (!clienteSeleccionado || !area || abogadoId === null) return;
     setLoading(true);
     setError(null);
     try {
@@ -243,7 +251,7 @@ export default function NuevoCasoPage() {
                       )}
                     </div>
                   ))
-                )}
+                }
               </div>
             )}
           </Card>
@@ -326,8 +334,9 @@ export default function NuevoCasoPage() {
           <Card>
             <SectionLabel>3. Abogado</SectionLabel>
             <select
-              value={abogadoId}
+              value={abogadoId ?? ''}
               onChange={(e) => setAbogadoId(Number(e.target.value))}
+              disabled={abogados.length === 0}
               style={{
                 width: '100%',
                 height: 44,
@@ -339,13 +348,16 @@ export default function NuevoCasoPage() {
                 color: '#131C2E',
                 fontFamily: 'Inter, sans-serif',
                 outline: 'none',
-                cursor: 'pointer',
+                cursor: abogados.length === 0 ? 'not-allowed' : 'pointer',
                 boxSizing: 'border-box',
               }}
             >
-              {MOCK_ABOGADOS.map((a) => (
+              {abogados.length === 0 && (
+                <option value="">Cargando usuarios…</option>
+              )}
+              {abogados.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.label}
+                  {a.nombre}
                 </option>
               ))}
             </select>

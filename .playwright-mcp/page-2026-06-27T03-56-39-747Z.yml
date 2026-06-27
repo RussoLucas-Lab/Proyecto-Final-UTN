@@ -1,0 +1,166 @@
+- generic [ref=e18]:
+  - navigation [ref=e19]:
+    - generic [ref=e21]: Iuris
+    - generic [ref=e23]:
+      - link "Dashboard" [ref=e24] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e25]
+        - text: Dashboard
+      - link "Casos" [ref=e30] [cursor=pointer]:
+        - /url: /casos
+        - img [ref=e31]
+        - text: Casos
+      - link "Clientes" [ref=e34] [cursor=pointer]:
+        - /url: /clientes
+        - img [ref=e35]
+        - text: Clientes
+      - link "Agenda" [ref=e40] [cursor=pointer]:
+        - /url: /agenda
+        - img [ref=e41]
+        - text: Agenda
+      - generic [ref=e43]: Administración
+      - link "Usuarios" [ref=e44] [cursor=pointer]:
+        - /url: /usuarios
+        - img [ref=e45]
+        - text: Usuarios
+      - link "Respaldos" [ref=e48] [cursor=pointer]:
+        - /url: /respaldos
+        - img [ref=e49]
+        - text: Respaldos
+    - generic [ref=e52]:
+      - generic [ref=e53]: ST
+      - generic [ref=e54]:
+        - generic [ref=e55]: Socio Test
+        - generic [ref=e56]: Socio
+      - button "Cerrar sesión" [ref=e57] [cursor=pointer]:
+        - img [ref=e58]
+  - generic [ref=e61]:
+    - banner [ref=e62]:
+      - generic [ref=e64]:
+        - img [ref=e65]
+        - searchbox "Buscar casos, clientes..." [ref=e68]
+      - button [ref=e69] [cursor=pointer]:
+        - img [ref=e70]
+      - generic [ref=e74]:
+        - generic [ref=e75]: ST
+        - generic [ref=e76]:
+          - generic [ref=e77]: Socio Test
+          - generic [ref=e78]: Socio
+        - img [ref=e79]
+    - main [ref=e81]:
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - generic [ref=e86]: Dashboard
+            - generic [ref=e87]: Miércoles, 24 de junio de 2026
+          - button "Revisar actualizaciones 3" [ref=e88] [cursor=pointer]:
+            - text: Revisar actualizaciones
+            - generic [ref=e89]: "3"
+        - generic [ref=e90]:
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - img [ref=e94]
+              - generic [ref=e97]:
+                - generic [ref=e98]: Casos Laboral
+                - generic [ref=e99]: "24"
+            - generic [ref=e100]: +2 este mes
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - img [ref=e104]
+              - generic [ref=e106]:
+                - generic [ref=e107]: Casos ART
+                - generic [ref=e108]: "11"
+            - generic [ref=e109]: +1 este mes
+          - generic [ref=e110]:
+            - generic [ref=e111]:
+              - img [ref=e113]
+              - generic [ref=e116]:
+                - generic [ref=e117]: Clientes nuevos
+                - generic [ref=e118]: "5"
+            - generic [ref=e119]: Últimos 30 días
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - img [ref=e123]
+              - generic [ref=e126]:
+                - generic [ref=e127]: Vencimientos próximos
+                - generic [ref=e128]: "8"
+            - generic [ref=e129]: 3 esta semana
+        - generic [ref=e130]:
+          - generic [ref=e131]:
+            - generic [ref=e132]:
+              - generic [ref=e133]: Actualizaciones para revisar
+              - generic [ref=e134]: "3"
+            - table [ref=e135]:
+              - rowgroup [ref=e136]:
+                - row "Cliente Área Etapa Borrador Acciones" [ref=e137]:
+                  - columnheader "Cliente" [ref=e138]
+                  - columnheader "Área" [ref=e139]
+                  - columnheader "Etapa" [ref=e140]
+                  - columnheader "Borrador" [ref=e141]
+                  - columnheader "Acciones" [ref=e142]
+              - rowgroup [ref=e143]:
+                - row "GP González Pérez, Carlos Laboral Telegrama 1 Estimado Sr. González... Revisar Copiar" [ref=e144]:
+                  - cell "GP González Pérez, Carlos" [ref=e145]:
+                    - generic [ref=e146]:
+                      - generic [ref=e147]: GP
+                      - generic [ref=e148]: González Pérez, Carlos
+                  - cell "Laboral" [ref=e149]
+                  - cell "Telegrama 1" [ref=e150]
+                  - cell "Estimado Sr. González..." [ref=e151]
+                  - cell "Revisar Copiar" [ref=e152]:
+                    - button "Revisar" [ref=e153] [cursor=pointer]
+                    - button "Copiar" [ref=e154] [cursor=pointer]
+                - row "MR Martínez Rojas, Ana ART Denuncia ART La presente tiene por objeto... Revisar Copiar" [ref=e155]:
+                  - cell "MR Martínez Rojas, Ana" [ref=e156]:
+                    - generic [ref=e157]:
+                      - generic [ref=e158]: MR
+                      - generic [ref=e159]: Martínez Rojas, Ana
+                  - cell "ART" [ref=e160]
+                  - cell "Denuncia ART" [ref=e161]
+                  - cell "La presente tiene por objeto..." [ref=e162]
+                  - cell "Revisar Copiar" [ref=e163]:
+                    - button "Revisar" [ref=e164] [cursor=pointer]
+                    - button "Copiar" [ref=e165] [cursor=pointer]
+                - row "DF Díaz Fuentes, Roberto Laboral Conciliación Me dirijo a Ud. a fin de... Revisar Copiar" [ref=e166]:
+                  - cell "DF Díaz Fuentes, Roberto" [ref=e167]:
+                    - generic [ref=e168]:
+                      - generic [ref=e169]: DF
+                      - generic [ref=e170]: Díaz Fuentes, Roberto
+                  - cell "Laboral" [ref=e171]
+                  - cell "Conciliación" [ref=e172]
+                  - cell "Me dirijo a Ud. a fin de..." [ref=e173]
+                  - cell "Revisar Copiar" [ref=e174]:
+                    - button "Revisar" [ref=e175] [cursor=pointer]
+                    - button "Copiar" [ref=e176] [cursor=pointer]
+          - generic [ref=e177]:
+            - generic [ref=e178]: Próximos vencimientos
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - generic [ref=e181]: "24"
+                - generic [ref=e182]: JUN
+              - generic [ref=e183]:
+                - generic [ref=e184]: Conciliación SECLO - González
+                - generic [ref=e185]:
+                  - generic [ref=e186]: Laboral
+                  - generic [ref=e187]: HOY
+            - generic [ref=e188]:
+              - generic [ref=e189]:
+                - generic [ref=e190]: "26"
+                - generic [ref=e191]: JUN
+              - generic [ref=e192]:
+                - generic [ref=e193]: Vence plazo telegrama 2 - Martínez
+                - generic [ref=e195]: ART
+            - generic [ref=e196]:
+              - generic [ref=e197]:
+                - generic [ref=e198]: "28"
+                - generic [ref=e199]: JUN
+              - generic [ref=e200]:
+                - generic [ref=e201]: Audiencia juzgado laboral - Pérez
+                - generic [ref=e203]: Laboral
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - generic [ref=e206]: "3"
+                - generic [ref=e207]: JUL
+              - generic [ref=e208]:
+                - generic [ref=e209]: Comisión médica - Rodríguez
+                - generic [ref=e211]: ART

@@ -155,11 +155,13 @@ class CasoResponse(BaseModel):
 
     id: int
     cliente_id: int
+    cliente_nombre: str | None = None
     abogado_responsable_id: int
     area: AreaDerecho
     tipo_reclamo: TipoReclamoArt | None
     codigo_expediente: str | None
     etapa_actual_id: int
+    etapa_actual_nombre: str | None = None
     fecha_inicio: date | None
     observaciones: str | None
     creado_en: datetime
@@ -176,6 +178,7 @@ class CasoDetalleResponse(BaseModel):
 
     id: int
     cliente_id: int
+    cliente_nombre: str | None = None
     abogado_responsable_id: int
     area: AreaDerecho
     tipo_reclamo: TipoReclamoArt | None

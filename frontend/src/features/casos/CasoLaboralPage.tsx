@@ -214,7 +214,7 @@ export default function CasoLaboralPage() {
               fontFamily: 'Inter, sans-serif',
             }}
           >
-            C{caso.cliente_id}
+            {(caso.cliente_nombre ?? `C${caso.cliente_id}`).slice(0, 2).toUpperCase()}
           </div>
           <div>
             <h2
@@ -226,7 +226,7 @@ export default function CasoLaboralPage() {
                 margin: '0 0 4px',
               }}
             >
-              Cliente #{caso.cliente_id}
+              {caso.cliente_nombre ?? `Cliente #${caso.cliente_id}`}
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#7B8799' }}>
@@ -575,7 +575,7 @@ export default function CasoLaboralPage() {
               Contacto
             </p>
             <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: '#131C2E', fontFamily: 'Inter, sans-serif' }}>
-              Cliente #{caso.cliente_id}
+              {caso.cliente_nombre ?? `Cliente #${caso.cliente_id}`}
             </p>
             <p style={{ margin: 0, fontSize: 12, color: '#9BA8B8', fontFamily: 'Inter, sans-serif' }}>
               Ver datos en sección Clientes

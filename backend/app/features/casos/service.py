@@ -25,6 +25,7 @@ from app.features.casos.models import Caso, Etapa, FichaLaboral, HistorialCaso, 
 from app.features.casos.schemas import (
     CasoCreate,
     CasoDetalleResponse,
+    CasoResponse,
     EtapaResponse,
     FichaLaboralResponse,
     FichaLaboralUpsert,
@@ -324,8 +325,11 @@ def obtener_detalle(db: Session, caso: Caso) -> CasoDetalleResponse:
     transiciones_validas (etapas destino con transición desde la etapa actual).
     Los nombres de etapa vienen del dato — nunca hardcodeados.
     """
+    from app.features.clientes.models import Cliente
+
     etapa_actual_orm = db.get(Etapa, caso.etapa_actual_id)
     ficha_orm = db.scalar(select(FichaLaboral).where(FichaLaboral.caso_id == caso.id))
+    cliente_orm = db.get(Cliente, caso.cliente_id)
 
     # Etapas destino alcanzables desde la etapa actual (transiciones_validas)
     transiciones_orm = list(
@@ -340,6 +344,7 @@ def obtener_detalle(db: Session, caso: Caso) -> CasoDetalleResponse:
     return CasoDetalleResponse(
         id=caso.id,
         cliente_id=caso.cliente_id,
+        cliente_nombre=cliente_orm.nombre if cliente_orm else None,
         abogado_responsable_id=caso.abogado_responsable_id,
         area=caso.area,
         tipo_reclamo=caso.tipo_reclamo,
@@ -367,17 +372,25 @@ def listar_casos(
     abogado_id: int | None = None,
     cliente_id: int | None = None,
     page: int = 1,
-) -> list[Caso]:
+) -> list[CasoResponse]:
     """Retorna la lista paginada de casos con filtros opcionales combinables (RF-13, D9).
 
     Todos los filtros son opcionales y se combinan con AND.
     SQL parametrizado via SQLAlchemy (nunca concatenación).
     Paginación: PAGE_SIZE fijo, offset = (page - 1) * PAGE_SIZE.
+    Incluye cliente_nombre y etapa_actual_nombre via JOIN para evitar N+1.
     """
+    from app.features.clientes.models import Cliente
+
     page = max(1, page)
     offset = (page - 1) * PAGE_SIZE
 
-    stmt = select(Caso).order_by(Caso.id.desc())
+    stmt = (
+        select(Caso, Cliente.nombre, Etapa.nombre)
+        .join(Cliente, Caso.cliente_id == Cliente.id)
+        .join(Etapa, Caso.etapa_actual_id == Etapa.id)
+        .order_by(Caso.id.desc())
+    )
 
     if area is not None:
         stmt = stmt.where(Caso.area == area)
@@ -389,7 +402,25 @@ def listar_casos(
         stmt = stmt.where(Caso.cliente_id == cliente_id)
 
     stmt = stmt.offset(offset).limit(PAGE_SIZE)
-    return list(db.scalars(stmt))
+    rows = db.execute(stmt).all()
+
+    return [
+        CasoResponse(
+            id=caso.id,
+            cliente_id=caso.cliente_id,
+            cliente_nombre=nombre_cliente,
+            abogado_responsable_id=caso.abogado_responsable_id,
+            area=caso.area,
+            tipo_reclamo=caso.tipo_reclamo,
+            codigo_expediente=caso.codigo_expediente,
+            etapa_actual_id=caso.etapa_actual_id,
+            etapa_actual_nombre=nombre_etapa,
+            fecha_inicio=caso.fecha_inicio,
+            observaciones=caso.observaciones,
+            creado_en=caso.creado_en,
+        )
+        for caso, nombre_cliente, nombre_etapa in rows
+    ]
 
 
 def listar_historial(db: Session, caso_id: int) -> list[HistorialCaso]:

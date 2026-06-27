@@ -57,14 +57,4 @@
 - [x] 6.2 Actualizar `docs/changemap.md`: filas RF-08 / RF-09 / RF-10 / RF-11 / RF-12 / RF-13 (feature `casos`) → estado y Rama/PR; agregar línea al changelog y registrar cualquier desvío del contrato.
 - [x] 6.3 Verificación manual end-to-end (requiere `docker compose up --build` + seed de etapas): ABOGADO crea un caso, completa la ficha, avanza por una transición válida, intenta una inválida (409), retrocede desde terminal con confirmación, y consulta el historial inmutable. Verificar en Swagger (`:8000/docs`) y en la UI (`:3000/casos`). **Pasos de verificación:** -[](1) `docker compose up --build` (2) `psql $DATABASE_URL -f backend/seeds/seed_etapas.sql` (3) Login como ABOGADO en `:3000` (4) `POST /api/v1/casos` en Swagger o UI (5) `GET /api/v1/casos/{id}` verifica `transiciones_validas` (6) `POST /api/v1/casos/{id}/avanzar` con etapa válida (200) e inválida (409) (7) `POST /api/v1/casos/{id}/retroceder` sin `confirmar` (409), luego con `confirmar:true` (200) (8) `GET /api/v1/casos/{id}/historial` — no debe haber endpoint DELETE (405).
 
-¡Atencion!
 
-el cliente se persiste correctamente, pero no se ve en la page de crear caso RESOLVER
-403 en POST casos
-
-borrar
-
-{
-"email": "socio@iuris.test",
-"password": "SocioPass1!"
-}
