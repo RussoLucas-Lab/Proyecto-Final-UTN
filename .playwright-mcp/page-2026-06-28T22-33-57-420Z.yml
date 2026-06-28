@@ -1,0 +1,83 @@
+- generic [ref=e5]:
+  - navigation [ref=e6]:
+    - generic [ref=e8]: Iuris
+    - generic [ref=e10]:
+      - link "Dashboard" [ref=e11] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e12]
+        - text: Dashboard
+      - link "Casos" [ref=e17] [cursor=pointer]:
+        - /url: /casos
+        - img [ref=e18]
+        - text: Casos
+      - link "Clientes" [ref=e21] [cursor=pointer]:
+        - /url: /clientes
+        - img [ref=e22]
+        - text: Clientes
+      - link "Agenda" [ref=e27] [cursor=pointer]:
+        - /url: /agenda
+        - img [ref=e28]
+        - text: Agenda
+      - generic [ref=e30]: Administración
+      - link "Usuarios" [ref=e31] [cursor=pointer]:
+        - /url: /usuarios
+        - img [ref=e32]
+        - text: Usuarios
+      - link "Respaldos" [ref=e35] [cursor=pointer]:
+        - /url: /respaldos
+        - img [ref=e36]
+        - text: Respaldos
+    - generic [ref=e39]:
+      - generic [ref=e40]: ST
+      - generic [ref=e41]:
+        - generic [ref=e42]: Socio Test
+        - generic [ref=e43]: Socio
+      - button "Cerrar sesión" [ref=e44] [cursor=pointer]:
+        - img [ref=e45]
+  - generic [ref=e48]:
+    - banner [ref=e49]:
+      - generic [ref=e51]:
+        - img [ref=e52]
+        - searchbox "Buscar casos, clientes..." [ref=e55]
+      - button [ref=e56] [cursor=pointer]:
+        - img [ref=e57]
+      - generic [ref=e61]:
+        - generic [ref=e62]: ST
+        - generic [ref=e63]:
+          - generic [ref=e64]: Socio Test
+          - generic [ref=e65]: Socio
+        - img [ref=e66]
+    - main [ref=e68]:
+      - generic [ref=e199]:
+        - generic [ref=e200]:
+          - generic [ref=e201]:
+            - heading "Casos" [level=1] [ref=e202]
+            - paragraph [ref=e203]: 1 casos en total
+          - button "+ Nuevo caso" [ref=e204] [cursor=pointer]
+        - generic [ref=e205]:
+          - generic [ref=e206]:
+            - button "Todos" [ref=e207] [cursor=pointer]
+            - button "Laboral" [ref=e208] [cursor=pointer]
+            - button "ART" [ref=e209] [cursor=pointer]
+          - textbox "Buscar por expediente..." [ref=e210]
+        - table [ref=e212]:
+          - rowgroup [ref=e213]:
+            - row "Cliente Área Expediente Etapa Alta" [ref=e214]:
+              - columnheader "Cliente" [ref=e215]
+              - columnheader "Área" [ref=e216]
+              - columnheader "Expediente" [ref=e217]
+              - columnheader "Etapa" [ref=e218]
+              - columnheader "Alta" [ref=e219]
+              - columnheader [ref=e220]
+          - rowgroup [ref=e221]:
+            - row "PE pedrio Laboral — Telegrama 1 27/06/2026 Ver" [ref=e222]:
+              - cell "PE pedrio" [ref=e223]:
+                - generic [ref=e224]:
+                  - generic [ref=e225]: PE
+                  - generic [ref=e226]: pedrio
+              - cell "Laboral" [ref=e227]
+              - cell "—" [ref=e228]
+              - cell "Telegrama 1" [ref=e229]
+              - cell "27/06/2026" [ref=e230]
+              - cell "Ver" [ref=e231]:
+                - button "Ver" [ref=e232] [cursor=pointer]

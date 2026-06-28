@@ -6,15 +6,27 @@
  * y `transiciones_validas` del endpoint GET /casos/{id}.
  *
  * Props:
- *   etapaActual        — etapa en la que está el caso
- *   transicionesValidas — etapas a las que se puede avanzar
- *   onAvanzar          — callback con el id de la etapa destino
- *   onRetroceder       — abre el modal de confirmación de retroceso
- *   isLoading          — deshabilita acciones mientras se procesa
- *   area               — para colorear (LABORAL vs ART)
+ *   etapaActual              — etapa en la que está el caso
+ *   transicionesValidas       — etapas a las que se puede avanzar
+ *   onAvanzar                — callback con el id de la etapa destino
+ *   onRetroceder             — abre el modal de confirmación de retroceso
+ *   isLoading                — deshabilita acciones mientras se procesa
+ *   avanzarBloqueado         — bloquea el avance con mensaje explicativo
+ *   resultadoTelegrama       — resultado actual del telegrama (null = sin selección)
+ *   onSetResultadoTelegrama  — si presente, muestra el dropdown de resultado
+ *   area                     — para colorear (LABORAL vs ART)
  */
 import React, { useState } from 'react';
+import type { ResultadoTelegrama } from '../../telegramas/types';
 import type { AreaDerecho, Etapa } from '../types';
+
+const RESULTADO_LABELS: Record<string, string> = {
+  ENTREGADO: 'Entregado',
+  RECHAZADO: 'Rechazado',
+  EN_SUCURSAL: 'En sucursal',
+  DOMICILIO_INEXISTENTE: 'Domicilio inexistente',
+  CERRADO: 'Domicilio cerrado',
+};
 
 interface StepperEtapasProps {
   etapaActual: Etapa;
@@ -22,6 +34,9 @@ interface StepperEtapasProps {
   onAvanzar: (etapaDestinoId: number) => Promise<void>;
   onRetroceder: () => void;
   isLoading?: boolean;
+  avanzarBloqueado?: boolean;
+  resultadoTelegrama?: ResultadoTelegrama | null;
+  onSetResultadoTelegrama?: (resultado: ResultadoTelegrama) => Promise<void>;
   area: AreaDerecho;
 }
 
@@ -31,6 +46,9 @@ export function StepperEtapas({
   onAvanzar,
   onRetroceder,
   isLoading = false,
+  avanzarBloqueado = false,
+  resultadoTelegrama,
+  onSetResultadoTelegrama,
   area,
 }: StepperEtapasProps) {
   const [selectedDestino, setSelectedDestino] = useState<number | null>(
@@ -122,6 +140,53 @@ export function StepperEtapas({
         </div>
       </div>
 
+      {/* Dropdown resultado telegrama — solo cuando la etapa lo requiere */}
+      {onSetResultadoTelegrama !== undefined && (
+        <div style={{ marginBottom: 16 }}>
+          <p
+            style={{
+              margin: '0 0 8px',
+              fontSize: 11,
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+              color: '#7B8799',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Resultado del telegrama
+          </p>
+          <select
+            value={resultadoTelegrama && resultadoTelegrama !== 'PENDIENTE' ? resultadoTelegrama : ''}
+            onChange={(e) => {
+              if (e.target.value) {
+                void onSetResultadoTelegrama(e.target.value as ResultadoTelegrama);
+              }
+            }}
+            style={{
+              border: '1px solid #E5E2D8',
+              borderRadius: 6,
+              padding: '7px 12px',
+              fontSize: 13,
+              color: '#131C2E',
+              fontFamily: 'Inter, sans-serif',
+              background: '#FFFFFF',
+              cursor: 'pointer',
+              minWidth: 220,
+            }}
+          >
+            <option value="" disabled>
+              Seleccionar resultado…
+            </option>
+            {Object.entries(RESULTADO_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Error */}
       {errorLocal && (
         <div
@@ -182,22 +247,40 @@ export function StepperEtapas({
           </div>
           <button
             onClick={() => void handleAvanzar()}
-            disabled={!selectedDestino || advancing || isLoading}
+            disabled={!selectedDestino || advancing || isLoading || avanzarBloqueado}
             style={{
-              background: !selectedDestino || advancing || isLoading ? '#C0C9D4' : primaryColor,
+              background:
+                !selectedDestino || advancing || isLoading || avanzarBloqueado
+                  ? '#C0C9D4'
+                  : primaryColor,
               color: '#FFFFFF',
               border: 'none',
               borderRadius: 8,
               padding: '9px 20px',
               fontSize: 13,
               fontWeight: 600,
-              cursor: !selectedDestino || advancing || isLoading ? 'not-allowed' : 'pointer',
+              cursor:
+                !selectedDestino || advancing || isLoading || avanzarBloqueado
+                  ? 'not-allowed'
+                  : 'pointer',
               fontFamily: 'Inter, sans-serif',
               marginRight: 8,
             }}
           >
             {advancing ? 'Avanzando…' : 'Confirmar avance →'}
           </button>
+          {avanzarBloqueado && (
+            <p
+              style={{
+                margin: '8px 0 0',
+                fontSize: 12,
+                color: '#C9423A',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              Registrá el resultado del telegrama para continuar
+            </p>
+          )}
         </div>
       ) : (
         <p

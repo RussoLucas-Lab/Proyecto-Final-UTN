@@ -9,11 +9,20 @@ import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { IAModal } from '../comunicaciones/IAModal';
+import { useTelegramas } from '../telegramas/hooks/useTelegramas';
+import type { ResultadoTelegrama } from '../telegramas/types';
 import { HistorialTimeline } from './components/HistorialTimeline';
 import { RetrocederModal } from './components/RetrocederModal';
 import { StepperEtapas } from './components/StepperEtapas';
 import { useCaso } from './hooks/useCaso';
 import type { Etapa } from './types';
+
+function parseTelegramaNumero(nombre: string | undefined): 1 | 2 | 3 | null {
+  if (!nombre) return null;
+  const m = nombre.match(/telegrama\s+(\d)/i);
+  const n = m ? parseInt(m[1]) : null;
+  return n === 1 || n === 2 || n === 3 ? n : null;
+}
 
 const MOCK_DOCUMENTOS = [
   { id: 1, nombre: 'Telegrama_obrero_01.pdf', fecha: '15/03/2026' },
@@ -107,6 +116,13 @@ export default function CasoLaboralPage() {
   useAuth(); // mantener sesión activa
 
   const { caso, historial, isLoading, error, avanzar, retroceder } = useCaso(casoId);
+  const { telegramas, setResultado } = useTelegramas(casoId);
+
+  const telegramaNumero = parseTelegramaNumero(caso?.etapa_actual?.nombre);
+  const telegramaActual = telegramaNumero ? telegramas.find((t) => t.numero === telegramaNumero) ?? null : null;
+  const resultadoActual = telegramaActual?.resultado ?? null;
+  const hayTelegramaPendiente =
+    telegramaNumero !== null && (!resultadoActual || resultadoActual === 'PENDIENTE');
 
   const [showIAModal, setShowIAModal] = useState(false);
   const [showRetrocederModal, setShowRetrocederModal] = useState(false);
@@ -258,6 +274,13 @@ export default function CasoLaboralPage() {
             onAvanzar={avanzar}
             onRetroceder={() => setShowRetrocederModal(true)}
             area="LABORAL"
+            avanzarBloqueado={hayTelegramaPendiente}
+            resultadoTelegrama={telegramaNumero !== null ? resultadoActual : undefined}
+            onSetResultadoTelegrama={
+              telegramaNumero !== null
+                ? (r: ResultadoTelegrama) => setResultado(telegramaNumero, r)
+                : undefined
+            }
           />
         </div>
       )}
