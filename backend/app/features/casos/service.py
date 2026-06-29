@@ -19,7 +19,7 @@ Regla ADR-0008 ("estados como datos"):
 import logging
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.features.casos.models import Caso, Etapa, FichaLaboral, HistorialCaso, TransicionEtapa
 from app.features.casos.schemas import (
@@ -423,16 +423,31 @@ def listar_casos(
     ]
 
 
-def listar_historial(db: Session, caso_id: int) -> list[HistorialCaso]:
-    """Retorna el historial cronológico del caso (RF-12, RN-06, D5).
+def listar_historial(db: Session, caso_id: int) -> list[dict]:
+    """Retorna el historial cronológico del caso con nombres de etapa (RF-12, RN-06, D5).
 
-    Solo lectura (append-only): no se expone ningún update ni delete sobre historial_caso.
-    Orden cronológico por ocurrido_en y luego por id (para orden estable en mismo instante).
+    Solo lectura (append-only). Hace JOIN con etapa para incluir nombres legibles
+    sin hardcodear — conforme ADR-0008.
     """
-    return list(
-        db.scalars(
-            select(HistorialCaso)
-            .where(HistorialCaso.caso_id == caso_id)
-            .order_by(HistorialCaso.ocurrido_en.asc(), HistorialCaso.id.asc())
+    EtapaAnterior = aliased(Etapa)
+    EtapaNueva = aliased(Etapa)
+
+    rows = db.execute(
+        select(
+            HistorialCaso.id,
+            HistorialCaso.caso_id,
+            HistorialCaso.etapa_anterior_id,
+            EtapaAnterior.nombre.label("etapa_anterior_nombre"),
+            HistorialCaso.etapa_nueva_id,
+            EtapaNueva.nombre.label("etapa_nueva_nombre"),
+            HistorialCaso.evento,
+            HistorialCaso.autor_id,
+            HistorialCaso.ocurrido_en,
         )
-    )
+        .outerjoin(EtapaAnterior, HistorialCaso.etapa_anterior_id == EtapaAnterior.id)
+        .join(EtapaNueva, HistorialCaso.etapa_nueva_id == EtapaNueva.id)
+        .where(HistorialCaso.caso_id == caso_id)
+        .order_by(HistorialCaso.ocurrido_en.asc(), HistorialCaso.id.asc())
+    ).all()
+
+    return [row._asdict() for row in rows]

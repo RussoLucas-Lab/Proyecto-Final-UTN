@@ -200,7 +200,9 @@ class HistorialItemResponse(BaseModel):
     id: int
     caso_id: int
     etapa_anterior_id: int | None
+    etapa_anterior_nombre: str | None
     etapa_nueva_id: int
+    etapa_nueva_nombre: str
     evento: str
     autor_id: int
     ocurrido_en: datetime

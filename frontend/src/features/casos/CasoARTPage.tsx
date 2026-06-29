@@ -14,7 +14,6 @@ import { HistorialTimeline } from './components/HistorialTimeline';
 import { RetrocederModal } from './components/RetrocederModal';
 import { StepperEtapas } from './components/StepperEtapas';
 import { useCaso } from './hooks/useCaso';
-import type { Etapa } from './types';
 
 const MOCK_DOCUMENTOS = [
   { id: 1, nombre: 'Denuncia_ART_inicial.pdf', fecha: '20/06/2026' },
@@ -132,23 +131,17 @@ export default function CasoARTPage() {
     );
   }
 
-  // Etapas anteriores disponibles para retroceder
-  const etapasParaRetroceder: Etapa[] = historial
-    .filter((h) => h.etapa_anterior_id !== null && h.etapa_nueva_id !== caso.etapa_actual_id)
-    .reduce<Etapa[]>((acc, h) => {
-      const etapaId = h.etapa_anterior_id;
-      if (etapaId && !acc.some((e) => e.id === etapaId)) {
-        acc.push({
-          id: etapaId,
-          nombre: `Etapa ${etapaId}`,
-          area: caso.area,
-          fase: caso.etapa_actual?.fase ?? 'EXTRAJUDICIAL',
-          orden: 0,
-          es_terminal: false,
-        });
-      }
-      return acc;
-    }, []);
+  // Etapa natural anterior: buscamos el último "avance" que nos trajo a la etapa actual.
+  const ultimoAvanceAEtapaActual = [...historial]
+    .reverse()
+    .find((h) => h.etapa_nueva_id === caso.etapa_actual_id && h.evento === 'avance');
+  const etapaAnterior =
+    ultimoAvanceAEtapaActual?.etapa_anterior_id != null
+      ? {
+          id: ultimoAvanceAEtapaActual.etapa_anterior_id,
+          nombre: ultimoAvanceAEtapaActual.etapa_anterior_nombre ?? `Etapa ${ultimoAvanceAEtapaActual.etapa_anterior_id}`,
+        }
+      : null;
 
   return (
     <div
@@ -258,7 +251,7 @@ export default function CasoARTPage() {
             etapaActual={caso.etapa_actual}
             transicionesValidas={caso.transiciones_validas}
             onAvanzar={avanzar}
-            onRetroceder={() => setShowRetrocederModal(true)}
+            onRetroceder={etapaAnterior ? () => setShowRetrocederModal(true) : undefined}
             area="ART"
           />
         </div>
@@ -478,10 +471,11 @@ export default function CasoARTPage() {
       {showIAModal && <IAModal onClose={() => setShowIAModal(false)} />}
 
       {/* RetrocederModal */}
-      {showRetrocederModal && caso.etapa_actual && (
+      {showRetrocederModal && caso.etapa_actual && etapaAnterior && (
         <RetrocederModal
-          etapaActual={caso.etapa_actual}
-          etapasDisponibles={etapasParaRetroceder}
+          etapaActualNombre={caso.etapa_actual.nombre}
+          etapaDestinoId={etapaAnterior.id}
+          etapaDestinoNombre={etapaAnterior.nombre}
           onConfirmar={async (etapaDestinoId) => {
             await retroceder(etapaDestinoId, true);
             setShowRetrocederModal(false);

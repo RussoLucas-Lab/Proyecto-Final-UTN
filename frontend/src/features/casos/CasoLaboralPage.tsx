@@ -15,7 +15,6 @@ import { HistorialTimeline } from './components/HistorialTimeline';
 import { RetrocederModal } from './components/RetrocederModal';
 import { StepperEtapas } from './components/StepperEtapas';
 import { useCaso } from './hooks/useCaso';
-import type { Etapa } from './types';
 
 function parseTelegramaNumero(nombre: string | undefined): 1 | 2 | 3 | null {
   if (!nombre) return null;
@@ -143,28 +142,19 @@ export default function CasoLaboralPage() {
     );
   }
 
-  // Etapas a las que se puede retroceder: todas las etapas anteriores en el historial
-  // que sean distintas a la actual y del mismo área (el backend valida esto).
-  // Usamos los ids únicos del historial para construir la lista de opciones.
-  const etapasParaRetroceder: Etapa[] = historial
-    .filter((h) => h.etapa_anterior_id !== null && h.etapa_nueva_id !== caso.etapa_actual_id)
-    .reduce<Etapa[]>((acc, h) => {
-      // Solo etapas referenciadas como destino de algún evento que ya fue visitado
-      const etapa = h.etapa_anterior_id;
-      if (etapa && !acc.some((e) => e.id === etapa)) {
-        // Construir un Etapa mínimo a partir del historial
-        // (el nombre se muestra como "Etapa {id}" si no tenemos detalle completo)
-        acc.push({
-          id: etapa,
-          nombre: `Etapa ${etapa}`,
-          area: caso.area,
-          fase: caso.etapa_actual?.fase ?? 'EXTRAJUDICIAL',
-          orden: 0,
-          es_terminal: false,
-        });
-      }
-      return acc;
-    }, []);
+  // Etapa natural anterior: buscamos el último "avance" que nos trajo a la etapa actual.
+  // Usar la última entrada del historial es incorrecto si el movimiento más reciente fue
+  // un retroceso (e.g. T3→T2): en ese caso el anterior natural sigue siendo T1, no T3.
+  const ultimoAvanceAEtapaActual = [...historial]
+    .reverse()
+    .find((h) => h.etapa_nueva_id === caso.etapa_actual_id && h.evento === 'avance');
+  const etapaAnterior =
+    ultimoAvanceAEtapaActual?.etapa_anterior_id != null
+      ? {
+          id: ultimoAvanceAEtapaActual.etapa_anterior_id,
+          nombre: ultimoAvanceAEtapaActual.etapa_anterior_nombre ?? `Etapa ${ultimoAvanceAEtapaActual.etapa_anterior_id}`,
+        }
+      : null;
 
   return (
     <div
@@ -272,7 +262,7 @@ export default function CasoLaboralPage() {
             etapaActual={caso.etapa_actual}
             transicionesValidas={caso.transiciones_validas}
             onAvanzar={avanzar}
-            onRetroceder={() => setShowRetrocederModal(true)}
+            onRetroceder={etapaAnterior ? () => setShowRetrocederModal(true) : undefined}
             area="LABORAL"
             avanzarBloqueado={hayTelegramaPendiente}
             resultadoTelegrama={telegramaNumero !== null ? resultadoActual : undefined}
@@ -611,10 +601,11 @@ export default function CasoLaboralPage() {
       {showIAModal && <IAModal onClose={() => setShowIAModal(false)} />}
 
       {/* RetrocederModal */}
-      {showRetrocederModal && caso.etapa_actual && (
+      {showRetrocederModal && caso.etapa_actual && etapaAnterior && (
         <RetrocederModal
-          etapaActual={caso.etapa_actual}
-          etapasDisponibles={etapasParaRetroceder}
+          etapaActualNombre={caso.etapa_actual.nombre}
+          etapaDestinoId={etapaAnterior.id}
+          etapaDestinoNombre={etapaAnterior.nombre}
           onConfirmar={async (etapaDestinoId) => {
             await retroceder(etapaDestinoId, true);
             setShowRetrocederModal(false);

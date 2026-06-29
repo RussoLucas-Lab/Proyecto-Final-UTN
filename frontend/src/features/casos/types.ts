@@ -111,7 +111,9 @@ export interface HistorialItem {
   id: number;
   caso_id: number;
   etapa_anterior_id: number | null;
+  etapa_anterior_nombre: string | null;
   etapa_nueva_id: number;
+  etapa_nueva_nombre: string;
   evento: string;
   autor_id: number;
   ocurrido_en: string;

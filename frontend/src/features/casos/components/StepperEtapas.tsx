@@ -32,7 +32,7 @@ interface StepperEtapasProps {
   etapaActual: Etapa;
   transicionesValidas: Etapa[];
   onAvanzar: (etapaDestinoId: number) => Promise<void>;
-  onRetroceder: () => void;
+  onRetroceder?: () => void;
   isLoading?: boolean;
   avanzarBloqueado?: boolean;
   resultadoTelegrama?: ResultadoTelegrama | null;
@@ -296,26 +296,28 @@ export function StepperEtapas({
         </p>
       )}
 
-      {/* Retroceder */}
-      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #F2F0EA' }}>
-        <button
-          onClick={onRetroceder}
-          disabled={isLoading}
-          style={{
-            background: '#FEE4E2',
-            color: '#C9423A',
-            border: '1px solid #F5C2C0',
-            borderRadius: 8,
-            padding: '7px 16px',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-            fontFamily: 'Inter, sans-serif',
-          }}
-        >
-          Retroceder etapa…
-        </button>
-      </div>
+      {/* Retroceder — solo visible cuando hay etapa anterior */}
+      {onRetroceder && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #F2F0EA' }}>
+          <button
+            onClick={onRetroceder}
+            disabled={isLoading}
+            style={{
+              background: '#FEE4E2',
+              color: '#C9423A',
+              border: '1px solid #F5C2C0',
+              borderRadius: 8,
+              padding: '7px 16px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            Retroceder etapa…
+          </button>
+        </div>
+      )}
     </div>
   );
 }

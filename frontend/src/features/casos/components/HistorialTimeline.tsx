@@ -175,14 +175,14 @@ export function HistorialTimeline({ historial }: HistorialTimelineProps) {
               >
                 {item.etapa_anterior_id !== null ? (
                   <>
-                    <span>Etapa {item.etapa_anterior_id}</span>
+                    <span>{item.etapa_anterior_nombre ?? `Etapa ${item.etapa_anterior_id}`}</span>
                     <span style={{ color: '#C0C9D4' }}>→</span>
                   </>
                 ) : (
                   <span style={{ color: '#9BA8B8', fontStyle: 'italic' }}>inicio</span>
                 )}
                 <span style={{ fontWeight: 600, color: '#374151' }}>
-                  Etapa {item.etapa_nueva_id}
+                  {item.etapa_nueva_nombre}
                 </span>
               </div>
             </div>
