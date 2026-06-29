@@ -29,9 +29,9 @@ export function useCaso(id: number | undefined): UseCasoState & UseCasoActions {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const recargar = useCallback(async () => {
+  const recargar = useCallback(async (silencioso = false) => {
     if (id === undefined) return;
-    setIsLoading(true);
+    if (!silencioso) setIsLoading(true);
     setError(null);
     try {
       const [detalle, hist] = await Promise.all([
@@ -43,7 +43,7 @@ export function useCaso(id: number | undefined): UseCasoState & UseCasoActions {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar el caso');
     } finally {
-      setIsLoading(false);
+      if (!silencioso) setIsLoading(false);
     }
   }, [id]);
 
@@ -56,7 +56,7 @@ export function useCaso(id: number | undefined): UseCasoState & UseCasoActions {
       if (!id) return;
       // Lanza si 409 (TransicionInvalida) — el componente lo captura
       await api.avanzar(id, etapaDestinoId);
-      await recargar();
+      await recargar(true);
     },
     [id, recargar],
   );
@@ -66,7 +66,7 @@ export function useCaso(id: number | undefined): UseCasoState & UseCasoActions {
       if (!id) return;
       // Lanza si 409 (RetrocesoSinConfirmar o área inválida) — el componente lo captura
       await api.retroceder(id, etapaDestinoId, confirmar);
-      await recargar();
+      await recargar(true);
     },
     [id, recargar],
   );
@@ -75,7 +75,7 @@ export function useCaso(id: number | undefined): UseCasoState & UseCasoActions {
     async (datos: Parameters<typeof api.upsertFicha>[1]) => {
       if (!id) return;
       await api.upsertFicha(id, datos);
-      await recargar();
+      await recargar(true);
     },
     [id, recargar],
   );

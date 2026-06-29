@@ -146,64 +146,43 @@ export default function CasoARTPage() {
           marginBottom: 16,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-            <div
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+          <div
+            style={{
+              width: 46, height: 46, borderRadius: 10, background: '#E3F5F5',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, fontWeight: 700, color: '#0B7285', flexShrink: 0,
+            }}
+          >
+            {(caso.cliente_nombre ?? `C${caso.cliente_id}`).slice(0, 2).toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2
               style={{
-                width: 46, height: 46, borderRadius: 10, background: '#E3F5F5',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 14, fontWeight: 700, color: '#0B7285', flexShrink: 0,
+                fontFamily: '"Playfair Display", serif',
+                fontWeight: 700, fontSize: 22, color: '#131C2E',
+                margin: '0 0 6px', lineHeight: 1.1,
               }}
             >
-              {(caso.cliente_nombre ?? `C${caso.cliente_id}`).slice(0, 2).toUpperCase()}
+              {caso.cliente_nombre ?? `Cliente #${caso.cliente_id}`}
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#7B8799', background: '#F2F0EA', padding: '2px 8px', borderRadius: 4 }}>
+                {caso.codigo_expediente ?? '—'}
+              </span>
+              <Badge bg="#E3F5F5" color="#0B7285">ART</Badge>
+              {caso.tipo_reclamo && (
+                <Badge bg="#FEF3E2" color="#B45309">
+                  {TIPO_RECLAMO_LABEL[caso.tipo_reclamo] ?? caso.tipo_reclamo}
+                </Badge>
+              )}
+              {caso.etapa_actual && (
+                <Badge bg="#E3F5F5" color="#0B7285">{caso.etapa_actual.nombre}</Badge>
+              )}
+              <span style={{ fontSize: 12, color: '#8B95A5' }}>
+                Abogado #{caso.abogado_responsable_id}
+              </span>
             </div>
-            <div>
-              <h2
-                style={{
-                  fontFamily: '"Playfair Display", serif',
-                  fontWeight: 700, fontSize: 22, color: '#131C2E',
-                  margin: '0 0 6px', lineHeight: 1.1,
-                }}
-              >
-                {caso.cliente_nombre ?? `Cliente #${caso.cliente_id}`}
-              </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#7B8799', background: '#F2F0EA', padding: '2px 8px', borderRadius: 4 }}>
-                  {caso.codigo_expediente ?? '—'}
-                </span>
-                <Badge bg="#E3F5F5" color="#0B7285">ART</Badge>
-                {caso.tipo_reclamo && (
-                  <Badge bg="#FEF3E2" color="#B45309">
-                    {TIPO_RECLAMO_LABEL[caso.tipo_reclamo] ?? caso.tipo_reclamo}
-                  </Badge>
-                )}
-                {caso.etapa_actual && (
-                  <Badge bg="#E3F5F5" color="#0B7285">{caso.etapa_actual.nombre}</Badge>
-                )}
-                <span style={{ fontSize: 12, color: '#8B95A5' }}>
-                  Abogado #{caso.abogado_responsable_id}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Acciones rápidas en header */}
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            {etapaAnterior && (
-              <button
-                onClick={() => setShowRetrocederModal(true)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 14px', background: '#FFFFFF', color: '#7B8799',
-                  border: '1.5px solid #E5E2D8', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-                Retroceder
-              </button>
-            )}
           </div>
         </div>
 
@@ -316,6 +295,16 @@ export default function CasoARTPage() {
               ))}
             </div>
           </div>
+
+          {/* Historial */}
+          <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid #E5E2D8', padding: 22 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '.5px', margin: '0 0 18px' }}>
+              Historial del caso
+            </h3>
+            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+              <HistorialTimeline historial={historial} />
+            </div>
+          </div>
         </div>
 
         {/* RIGHT COLUMN */}
@@ -330,14 +319,6 @@ export default function CasoARTPage() {
               area="ART"
             />
           )}
-
-          {/* Historial */}
-          <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid #E5E2D8', padding: 22 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '.5px', margin: '0 0 16px' }}>
-              Historial
-            </h3>
-            <HistorialTimeline historial={historial} />
-          </div>
 
           {/* Contacto rápido */}
           <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid #E5E2D8', padding: 20 }}>

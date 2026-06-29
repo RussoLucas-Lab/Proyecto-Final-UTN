@@ -332,7 +332,9 @@ export default function CasoLaboralPage() {
             <h3 style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '.5px', margin: '0 0 18px' }}>
               Historial del caso
             </h3>
-            <HistorialTimeline historial={historial} />
+            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+              <HistorialTimeline historial={historial} />
+            </div>
           </div>
         </div>
 
