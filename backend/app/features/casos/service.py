@@ -452,3 +452,17 @@ def listar_historial(db: Session, caso_id: int) -> list[dict]:
     ).all()
 
     return [row._asdict() for row in rows]
+
+
+def listar_etapas(db: Session, area: AreaDerecho) -> list[Etapa]:
+    """Catálogo de etapas del área ordenadas por orden (ADR-0008).
+
+    Permite al frontend renderizar el stepper visual completo sin hardcodear
+    nombres ni estructura de etapas.
+    """
+    return (
+        db.query(Etapa)
+        .filter(Etapa.area == area)
+        .order_by(Etapa.orden)
+        .all()
+    )

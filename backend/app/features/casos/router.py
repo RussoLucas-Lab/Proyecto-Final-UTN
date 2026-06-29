@@ -54,6 +54,7 @@ from app.features.casos.service import (
     avanzar_etapa,
     crear_caso,
     listar_casos,
+    listar_etapas,
     listar_historial,
     obtener_detalle,
     retroceder_etapa,
@@ -136,6 +137,28 @@ async def get_casos(
         cliente_id=cliente_id,
         page=page,
     )
+
+
+# ── GET /casos/etapas ─────────────────────────────────────────────────────────
+
+
+@router.get("/etapas", response_model=list[EtapaResponse], status_code=status.HTTP_200_OK)
+@limiter.limit("100/minute")
+async def get_etapas_catalogo(
+    request: Request,
+    area: AreaDerecho = Query(..., description="Área (LABORAL/ART)"),
+    db: Session = Depends(get_db),
+    _current_user: Usuario = Depends(get_current_user),
+) -> list:
+    """Catálogo de etapas del área ordenadas por orden (ADR-0008).
+
+    Permite al frontend renderizar el stepper visual completo sin hardcodear
+    nombres ni estructura.
+
+    - 200: lista de EtapaResponse
+    - 401: sin sesión activa
+    """
+    return listar_etapas(db, area)
 
 
 # ── GET /casos/{id} ────────────────────────────────────────────────────────────

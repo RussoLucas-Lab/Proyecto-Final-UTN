@@ -1,21 +1,3 @@
-/**
- * Stepper de etapas del caso — completamente data-driven (ADR-0008).
- *
- * Muestra la etapa actual y las transiciones válidas disponibles (avanzar).
- * Nunca hardcodea nombres de etapa: toda la info viene de `etapa_actual`
- * y `transiciones_validas` del endpoint GET /casos/{id}.
- *
- * Props:
- *   etapaActual              — etapa en la que está el caso
- *   transicionesValidas       — etapas a las que se puede avanzar
- *   onAvanzar                — callback con el id de la etapa destino
- *   onRetroceder             — abre el modal de confirmación de retroceso
- *   isLoading                — deshabilita acciones mientras se procesa
- *   avanzarBloqueado         — bloquea el avance con mensaje explicativo
- *   resultadoTelegrama       — resultado actual del telegrama (null = sin selección)
- *   onSetResultadoTelegrama  — si presente, muestra el dropdown de resultado
- *   area                     — para colorear (LABORAL vs ART)
- */
 import React, { useState } from 'react';
 import type { ResultadoTelegrama } from '../../telegramas/types';
 import type { AreaDerecho, Etapa } from '../types';
@@ -70,7 +52,7 @@ export function StepperEtapas({
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('409')) {
-        setErrorLocal('Transición no permitida. La etapa seleccionada no es alcanzable desde la etapa actual.');
+        setErrorLocal('Transición no permitida desde la etapa actual.');
       } else {
         setErrorLocal('Error al avanzar. Intentá de nuevo.');
       }
@@ -79,104 +61,124 @@ export function StepperEtapas({
     }
   }
 
+  const canAdvance = !!selectedDestino && !advancing && !isLoading && !avanzarBloqueado;
+
   return (
     <div
       style={{
         background: '#FFFFFF',
-        border: '1px solid #E5E2D8',
         borderRadius: 12,
-        padding: '18px 22px',
+        border: '1px solid #E5E2D8',
+        overflow: 'hidden',
+        fontFamily: 'Inter, sans-serif',
       }}
     >
-      {/* Etapa actual */}
-      <div style={{ marginBottom: 16 }}>
-        <p
+      {/* Cabecera */}
+      <div
+        style={{
+          padding: '14px 18px',
+          background: '#F7F6F1',
+          borderBottom: '1px solid #E9E6DE',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span
           style={{
-            margin: '0 0 8px',
-            fontSize: 11,
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
+            fontSize: 10,
+            fontWeight: 700,
             color: '#7B8799',
             textTransform: 'uppercase',
-            letterSpacing: '0.5px',
+            letterSpacing: '.8px',
           }}
         >
           Etapa actual
-        </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span
-            style={{
-              background: lightBg,
-              color: primaryColor,
-              borderRadius: 6,
-              padding: '4px 10px',
-              fontSize: 13,
-              fontWeight: 700,
-              fontFamily: 'Inter, sans-serif',
-            }}
-          >
-            {etapaActual.nombre}
-          </span>
-          <span
-            style={{ fontSize: 12, color: '#9BA8B8', fontFamily: 'Inter, sans-serif' }}
-          >
-            {etapaActual.fase} · Orden {etapaActual.orden}
-          </span>
-          {etapaActual.es_terminal && (
-            <span
-              style={{
-                background: '#E6F4EE',
-                color: '#1A7A4A',
-                borderRadius: 4,
-                padding: '2px 8px',
-                fontSize: 11,
-                fontWeight: 600,
-                fontFamily: 'Inter, sans-serif',
-              }}
-            >
-              Etapa terminal
-            </span>
-          )}
-        </div>
+        </span>
+        <span
+          style={{
+            fontSize: 10,
+            color: '#B0A89C',
+            fontWeight: 500,
+            textTransform: 'uppercase',
+            letterSpacing: '.5px',
+          }}
+        >
+          {etapaActual.fase === 'EXTRAJUDICIAL' ? 'Extrajudicial' : 'Judicial'} · Orden{' '}
+          {etapaActual.orden}
+        </span>
       </div>
 
-      {/* Dropdown resultado telegrama — solo cuando la etapa lo requiere */}
-      {onSetResultadoTelegrama !== undefined && (
-        <div style={{ marginBottom: 16 }}>
-          <p
+      {/* Badge etapa actual */}
+      <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid #F2F0EA' }}>
+        <span
+          style={{
+            background: lightBg,
+            color: primaryColor,
+            fontSize: 13,
+            padding: '5px 14px',
+            borderRadius: 8,
+            fontWeight: 700,
+          }}
+        >
+          {etapaActual.nombre}
+        </span>
+        {etapaActual.es_terminal && (
+          <span
             style={{
-              margin: '0 0 8px',
+              marginLeft: 8,
+              background: '#E6F4EE',
+              color: '#1A7A4A',
+              borderRadius: 4,
+              padding: '2px 8px',
               fontSize: 11,
-              fontFamily: 'Inter, sans-serif',
               fontWeight: 600,
+            }}
+          >
+            Etapa terminal
+          </span>
+        )}
+      </div>
+
+      {/* Resultado del telegrama */}
+      {onSetResultadoTelegrama !== undefined && (
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #F2F0EA' }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: 10,
+              fontWeight: 700,
               color: '#7B8799',
               textTransform: 'uppercase',
-              letterSpacing: '0.5px',
+              letterSpacing: '.8px',
+              marginBottom: 8,
             }}
           >
             Resultado del telegrama
-          </p>
+          </label>
           <select
-            value={resultadoTelegrama && resultadoTelegrama !== 'PENDIENTE' ? resultadoTelegrama : ''}
+            value={
+              resultadoTelegrama && resultadoTelegrama !== 'PENDIENTE' ? resultadoTelegrama : ''
+            }
             onChange={(e) => {
               if (e.target.value) {
                 void onSetResultadoTelegrama(e.target.value as ResultadoTelegrama);
               }
             }}
             style={{
-              border: '1px solid #E5E2D8',
-              borderRadius: 6,
-              padding: '7px 12px',
+              width: '100%',
+              height: 38,
+              border: '1.5px solid #E5E2D8',
+              borderRadius: 8,
+              padding: '0 12px',
               fontSize: 13,
               color: '#131C2E',
-              fontFamily: 'Inter, sans-serif',
-              background: '#FFFFFF',
+              background: '#FAFAF7',
               cursor: 'pointer',
-              minWidth: 220,
             }}
           >
             <option value="" disabled>
-              Seleccionar resultado…
+              — Sin registrar —
             </option>
             {Object.entries(RESULTADO_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -184,58 +186,58 @@ export function StepperEtapas({
               </option>
             ))}
           </select>
+          {avanzarBloqueado && (
+            <p
+              style={{
+                margin: '6px 0 0',
+                fontSize: 11,
+                color: '#C9423A',
+              }}
+            >
+              Registrá el resultado para continuar
+            </p>
+          )}
         </div>
       )}
 
-      {/* Error */}
-      {errorLocal && (
-        <div
-          style={{
-            background: '#FEF2F2',
-            border: '1px solid #FECACA',
-            borderRadius: 8,
-            padding: '8px 14px',
-            marginBottom: 12,
-            fontSize: 12,
-            color: '#991B1B',
-            fontFamily: 'Inter, sans-serif',
-          }}
-        >
-          {errorLocal}
-        </div>
-      )}
-
-      {/* Transiciones válidas */}
-      {transicionesValidas.length > 0 ? (
-        <div>
-          <p
+      {/* Avanzar a */}
+      {transicionesValidas.length > 0 && (
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #F2F0EA' }}>
+          <label
             style={{
-              margin: '0 0 8px',
-              fontSize: 11,
-              fontFamily: 'Inter, sans-serif',
-              fontWeight: 600,
+              display: 'block',
+              fontSize: 10,
+              fontWeight: 700,
               color: '#7B8799',
               textTransform: 'uppercase',
-              letterSpacing: '0.5px',
+              letterSpacing: '.8px',
+              marginBottom: 10,
             }}
           >
             Avanzar a
-          </p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          </label>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: transicionesValidas.length > 1 ? '1fr 1fr' : '1fr',
+              gap: 8,
+            }}
+          >
             {transicionesValidas.map((etapa) => (
               <button
                 key={etapa.id}
                 onClick={() => setSelectedDestino(etapa.id)}
                 style={{
-                  border: selectedDestino === etapa.id
-                    ? `2px solid ${primaryColor}`
-                    : '1.5px solid #E5E2D8',
-                  background: selectedDestino === etapa.id ? lightBg : '#FAFAF7',
+                  height: 36,
+                  border:
+                    selectedDestino === etapa.id
+                      ? `1.5px solid ${primaryColor}`
+                      : '1.5px solid #E5E2D8',
                   borderRadius: 8,
-                  padding: '7px 14px',
-                  fontSize: 13,
-                  fontWeight: selectedDestino === etapa.id ? 700 : 500,
+                  background: selectedDestino === etapa.id ? lightBg : '#FAFAF7',
                   color: selectedDestino === etapa.id ? primaryColor : '#5A6478',
+                  fontSize: 12,
+                  fontWeight: selectedDestino === etapa.id ? 600 : 400,
                   cursor: 'pointer',
                   fontFamily: 'Inter, sans-serif',
                   transition: 'all 0.1s',
@@ -245,79 +247,101 @@ export function StepperEtapas({
               </button>
             ))}
           </div>
-          <button
-            onClick={() => void handleAvanzar()}
-            disabled={!selectedDestino || advancing || isLoading || avanzarBloqueado}
-            style={{
-              background:
-                !selectedDestino || advancing || isLoading || avanzarBloqueado
-                  ? '#C0C9D4'
-                  : primaryColor,
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: 8,
-              padding: '9px 20px',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor:
-                !selectedDestino || advancing || isLoading || avanzarBloqueado
-                  ? 'not-allowed'
-                  : 'pointer',
-              fontFamily: 'Inter, sans-serif',
-              marginRight: 8,
-            }}
-          >
-            {advancing ? 'Avanzando…' : 'Confirmar avance →'}
-          </button>
-          {avanzarBloqueado && (
-            <p
-              style={{
-                margin: '8px 0 0',
-                fontSize: 12,
-                color: '#C9423A',
-                fontFamily: 'Inter, sans-serif',
-              }}
-            >
-              Registrá el resultado del telegrama para continuar
-            </p>
-          )}
         </div>
-      ) : (
-        <p
-          style={{
-            margin: 0,
-            fontSize: 13,
-            color: '#9BA8B8',
-            fontFamily: 'Inter, sans-serif',
-            fontStyle: 'italic',
-          }}
-        >
-          No hay transiciones disponibles desde esta etapa.
-        </p>
       )}
 
-      {/* Retroceder — solo visible cuando hay etapa anterior */}
-      {onRetroceder && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #F2F0EA' }}>
+      {/* Error */}
+      {errorLocal && (
+        <div
+          style={{
+            margin: '0 18px',
+            marginTop: 8,
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: 12,
+            color: '#991B1B',
+          }}
+        >
+          {errorLocal}
+        </div>
+      )}
+
+      {/* Acciones */}
+      <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {transicionesValidas.length > 0 && (
+          <button
+            onClick={() => void handleAvanzar()}
+            disabled={!canAdvance}
+            style={{
+              width: '100%',
+              height: 40,
+              background: canAdvance ? primaryColor : '#C0C9D4',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 7,
+              cursor: canAdvance ? 'pointer' : 'not-allowed',
+              fontFamily: 'Inter, sans-serif',
+              transition: 'background 0.1s',
+            }}
+          >
+            {advancing ? 'Avanzando…' : 'Confirmar avance'}
+            {!advancing && (
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            )}
+          </button>
+        )}
+
+        {onRetroceder && (
           <button
             onClick={onRetroceder}
             disabled={isLoading}
             style={{
-              background: '#FEE4E2',
+              width: '100%',
+              height: 34,
+              background: 'none',
+              border: 'none',
               color: '#C9423A',
-              border: '1px solid #F5C2C0',
-              borderRadius: 8,
-              padding: '7px 16px',
               fontSize: 12,
-              fontWeight: 600,
               cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: 0.75,
               fontFamily: 'Inter, sans-serif',
             }}
           >
             Retroceder etapa…
           </button>
-        </div>
-      )}
+        )}
+
+        {transicionesValidas.length === 0 && !onRetroceder && (
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: '#9BA8B8',
+              fontStyle: 'italic',
+              textAlign: 'center',
+            }}
+          >
+            No hay transiciones disponibles.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

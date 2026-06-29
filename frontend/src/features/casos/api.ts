@@ -11,6 +11,7 @@ import type {
   Caso,
   CasoCreate,
   CasoDetalle,
+  Etapa,
   FichaLaboral,
   FichaLaboralUpsert,
   HistorialItem,
@@ -74,4 +75,9 @@ export function retroceder(
 /** Obtiene el historial cronológico e inmutable del caso (RF-12, RN-06). */
 export function historial(casoId: number): Promise<HistorialItem[]> {
   return http.get<HistorialItem[]>(`/casos/${casoId}/historial`);
+}
+
+/** Catálogo de etapas del área ordenadas por orden (ADR-0008). */
+export function listarEtapas(area: AreaDerecho): Promise<Etapa[]> {
+  return http.get<Etapa[]>(`/casos/etapas?area=${area}`);
 }
