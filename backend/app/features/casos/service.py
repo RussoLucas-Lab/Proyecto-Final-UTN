@@ -345,6 +345,7 @@ def obtener_detalle(db: Session, caso: Caso) -> CasoDetalleResponse:
         id=caso.id,
         cliente_id=caso.cliente_id,
         cliente_nombre=cliente_orm.nombre if cliente_orm else None,
+        cliente_telefono=cliente_orm.telefono if cliente_orm else None,
         abogado_responsable_id=caso.abogado_responsable_id,
         area=caso.area,
         tipo_reclamo=caso.tipo_reclamo,

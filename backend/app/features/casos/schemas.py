@@ -179,6 +179,7 @@ class CasoDetalleResponse(BaseModel):
     id: int
     cliente_id: int
     cliente_nombre: str | None = None
+    cliente_telefono: str | None = None
     abogado_responsable_id: int
     area: AreaDerecho
     tipo_reclamo: TipoReclamoArt | None

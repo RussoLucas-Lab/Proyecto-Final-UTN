@@ -51,6 +51,7 @@ export interface Caso {
   id: number;
   cliente_id: number;
   cliente_nombre: string | null;
+  cliente_telefono?: string | null;
   abogado_responsable_id: number;
   area: AreaDerecho;
   tipo_reclamo: TipoReclamoArt | null;
