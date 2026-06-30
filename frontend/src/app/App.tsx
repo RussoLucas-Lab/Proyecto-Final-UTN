@@ -13,7 +13,7 @@ const ClientesPage      = lazy(() => import('../features/clientes/ClientesPage')
 const NuevoClientePage  = lazy(() => import('../features/clientes/NuevoClientePage'));
 const BatchPage         = lazy(() => import('../features/comunicaciones/BatchPage'));
 const TelegramaPage     = lazy(() => import('../features/telegramas/TelegramaPage'));
-const AgendaPage        = lazy(() => import('../features/agenda/AgendaPage'));
+const AgendaPage        = lazy(() => import('../features/vencimientos/AgendaPage'));
 const UsuariosPage      = lazy(() => import('../features/usuarios/UsuariosPage'));
 const RespaldosPage     = lazy(() => import('../features/respaldos/RespaldosPage'));
 

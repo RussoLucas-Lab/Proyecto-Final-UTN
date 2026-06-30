@@ -14,6 +14,7 @@ from app.features.clientes.router import router as clientes_router
 from app.features.documentos.router import router as documentos_router
 from app.features.telegramas.router import router as telegramas_router
 from app.features.usuarios.router import router as usuarios_router
+from app.features.vencimientos.router import router as vencimientos_router
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -108,3 +109,4 @@ app.include_router(clientes_router, prefix="/api/v1")
 app.include_router(casos_router, prefix="/api/v1")
 app.include_router(documentos_router, prefix="/api/v1")
 app.include_router(telegramas_router, prefix="/api/v1")
+app.include_router(vencimientos_router, prefix="/api/v1")

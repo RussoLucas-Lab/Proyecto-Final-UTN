@@ -6,6 +6,10 @@ import { listDocumentos } from '../documentos/api';
 import { DocumentList } from '../documentos/components/DocumentList';
 import { DocumentUploader } from '../documentos/components/DocumentUploader';
 import type { DocumentoResponse } from '../documentos/types';
+import { listarVencimientosCaso } from '../vencimientos/api';
+import { VencimientoForm } from '../vencimientos/components/VencimientoForm';
+import { VencimientoList } from '../vencimientos/components/VencimientoList';
+import type { VencimientoResponse } from '../vencimientos/types';
 import { useTelegramas } from '../telegramas/hooks/useTelegramas';
 import type { ResultadoTelegrama } from '../telegramas/types';
 import { HistorialTimeline } from './components/HistorialTimeline';
@@ -95,10 +99,12 @@ export default function CasoLaboralPage() {
   const [showIAModal, setShowIAModal] = useState(false);
   const [showRetrocederModal, setShowRetrocederModal] = useState(false);
   const [documentos, setDocumentos] = useState<DocumentoResponse[]>([]);
+  const [vencimientos, setVencimientos] = useState<VencimientoResponse[]>([]);
 
   useEffect(() => {
     if (!casoId) return;
     listDocumentos(casoId).then(setDocumentos).catch(() => {});
+    listarVencimientosCaso(casoId).then(setVencimientos).catch(() => {});
   }, [casoId]);
 
   if (isLoading) {
@@ -305,6 +311,25 @@ export default function CasoLaboralPage() {
             )}
             <div style={{ marginTop: 14 }}>
               <DocumentList documentos={documentos} />
+            </div>
+          </div>
+
+          {/* Vencimientos */}
+          <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid #E5E2D8', padding: 22 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '.5px', margin: '0 0 16px' }}>
+              Vencimientos
+            </h3>
+            {casoId && (
+              <VencimientoForm
+                casoId={casoId}
+                onCreado={(v) => setVencimientos((prev) => [...prev, v].sort((a, b) => a.fecha.localeCompare(b.fecha)))}
+              />
+            )}
+            <div style={{ marginTop: 14 }}>
+              <VencimientoList
+                vencimientos={vencimientos}
+                onChange={(updated) => setVencimientos((prev) => prev.map((v) => (v.id === updated.id ? updated : v)))}
+              />
             </div>
           </div>
 
