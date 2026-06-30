@@ -40,6 +40,7 @@ from app.features.casos.schemas import (
     CasoCreate,
     CasoDetalleResponse,
     CasoResponse,
+    EtapaResponse,
     FichaLaboralResponse,
     FichaLaboralUpsert,
     HistorialItemResponse,

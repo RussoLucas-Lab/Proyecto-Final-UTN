@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { IAModal } from '../comunicaciones/IAModal';
+import { listDocumentos } from '../documentos/api';
+import { DocumentList } from '../documentos/components/DocumentList';
+import { DocumentUploader } from '../documentos/components/DocumentUploader';
+import type { DocumentoResponse } from '../documentos/types';
 import { useTelegramas } from '../telegramas/hooks/useTelegramas';
 import type { ResultadoTelegrama } from '../telegramas/types';
 import { HistorialTimeline } from './components/HistorialTimeline';
@@ -17,12 +21,6 @@ function parseTelegramaNumero(nombre: string | undefined): 1 | 2 | 3 | null {
   const n = m ? parseInt(m[1]) : null;
   return n === 1 || n === 2 || n === 3 ? n : null;
 }
-
-const MOCK_DOCUMENTOS = [
-  { id: 1, nombre: 'Telegrama_obrero_01.pdf', fecha: '15/03/2026' },
-  { id: 2, nombre: 'Contrato_laboral_original.pdf', fecha: '16/03/2026' },
-  { id: 3, nombre: 'Recibos_sueldo_2025.pdf', fecha: '18/03/2026' },
-];
 
 function Badge({ bg, color, children }: { bg: string; color: string; children: React.ReactNode }) {
   return (
@@ -96,6 +94,12 @@ export default function CasoLaboralPage() {
 
   const [showIAModal, setShowIAModal] = useState(false);
   const [showRetrocederModal, setShowRetrocederModal] = useState(false);
+  const [documentos, setDocumentos] = useState<DocumentoResponse[]>([]);
+
+  useEffect(() => {
+    if (!casoId) return;
+    listDocumentos(casoId).then(setDocumentos).catch(() => {});
+  }, [casoId]);
 
   if (isLoading) {
     return (
@@ -290,40 +294,17 @@ export default function CasoLaboralPage() {
 
           {/* Documentos */}
           <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid #E5E2D8', padding: 22 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '.5px', margin: 0 }}>
-                Documentos
-              </h3>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1B3A6B', color: '#fff', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Subir archivo
-                <input type="file" style={{ display: 'none' }} />
-              </label>
-            </div>
-            <div style={{ border: '2px dashed #D8D4CA', borderRadius: 10, padding: 20, textAlign: 'center', background: '#FAFAF7', marginBottom: 14 }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C0BAB0" strokeWidth="1.5" style={{ margin: '0 auto 8px', display: 'block' }}>
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              <div style={{ fontSize: 13, color: '#8B95A5' }}>Arrastre archivos aquí o use el botón de subir</div>
-              <div style={{ fontSize: 11, color: '#B0A89C', marginTop: 4 }}>PDF, DOC, JPG — Solo el abogado puede subir documentos</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {MOCK_DOCUMENTOS.map((doc) => (
-                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F7F6F1', borderRadius: 8, border: '1px solid #E9E6DE' }}>
-                  <div style={{ width: 32, height: 32, background: '#FEE4E2', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: 9, fontWeight: 800, color: '#C9423A' }}>PDF</span>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#131C2E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.nombre}</div>
-                    <div style={{ fontSize: 11, color: '#8B95A5', marginTop: 1 }}>Subido el {doc.fecha}</div>
-                  </div>
-                </div>
-              ))}
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '.5px', margin: '0 0 16px' }}>
+              Documentos
+            </h3>
+            {casoId && (
+              <DocumentUploader
+                casoId={casoId}
+                onUploaded={(doc) => setDocumentos((prev) => [doc, ...prev])}
+              />
+            )}
+            <div style={{ marginTop: 14 }}>
+              <DocumentList documentos={documentos} />
             </div>
           </div>
 

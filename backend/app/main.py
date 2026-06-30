@@ -11,6 +11,7 @@ from app.core.rate_limit import limiter
 from app.features.auth.router import router as auth_router
 from app.features.casos.router import router as casos_router
 from app.features.clientes.router import router as clientes_router
+from app.features.documentos.router import router as documentos_router
 from app.features.telegramas.router import router as telegramas_router
 from app.features.usuarios.router import router as usuarios_router
 
@@ -105,4 +106,5 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(usuarios_router, prefix="/api/v1")
 app.include_router(clientes_router, prefix="/api/v1")
 app.include_router(casos_router, prefix="/api/v1")
+app.include_router(documentos_router, prefix="/api/v1")
 app.include_router(telegramas_router, prefix="/api/v1")

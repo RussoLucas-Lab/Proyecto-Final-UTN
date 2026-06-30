@@ -11,6 +11,8 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.2.1
 slowapi==0.1.9
 python-multipart==0.0.20
+# Storage S3-compatible (MinIO dev / Cloudflare R2 prod — ADR-0010)
+boto3==1.35.0
 # Tests
 pytest>=7.0
 pytest-cov>=4.0
