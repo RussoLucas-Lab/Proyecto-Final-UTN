@@ -1,7 +1,7 @@
 import React from 'react';
-import type { VencimientoResponse } from '../types';
+import type { VencimientoAgendaItem } from '../types';
 
-const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const DIAS_SEMANA = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -11,21 +11,46 @@ const MESES = [
 interface Props {
   año: number;
   mes: number; // 0-based
-  vencimientos: VencimientoResponse[];
+  vencimientos: VencimientoAgendaItem[];
   onPrev: () => void;
   onNext: () => void;
+  selectedDay: number | null;
+  onSelectDay: (dia: number | null) => void;
 }
 
 function isoFecha(año: number, mes: number, dia: number): string {
   return `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
 }
 
-export function CalendarioMes({ año, mes, vencimientos, onPrev, onNext }: Props) {
-  const primerDia = new Date(año, mes, 1).getDay(); // 0=Dom
+function chipStyle(area: string, completado: boolean): React.CSSProperties {
+  const isArt = area === 'ART';
+  const bg = completado ? '#F0FDF4' : isArt ? '#E3F5F5' : '#E8EDF8';
+  const color = completado ? '#16A34A' : isArt ? '#0B7285' : '#1B3A6B';
+  return {
+    display: 'block',
+    fontSize: 10,
+    fontWeight: 500,
+    padding: '2px 5px',
+    borderRadius: 4,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    marginTop: 3,
+    background: bg,
+    color,
+    textDecoration: completado ? 'line-through' : 'none',
+    fontFamily: 'Inter, sans-serif',
+  };
+}
+
+export function CalendarioMes({
+  año, mes, vencimientos, onPrev, onNext, selectedDay, onSelectDay,
+}: Props) {
+  const primerDow = new Date(año, mes, 1).getDay(); // 0=Dom
+  const offsetLunes = (primerDow + 6) % 7;           // 0=Lun, 6=Dom
   const diasEnMes = new Date(año, mes + 1, 0).getDate();
 
-  // Group vencimientos by fecha ISO string
-  const porFecha = new Map<string, VencimientoResponse[]>();
+  const porFecha = new Map<string, VencimientoAgendaItem[]>();
   for (const v of vencimientos) {
     const key = v.fecha.slice(0, 10);
     if (!porFecha.has(key)) porFecha.set(key, []);
@@ -36,130 +61,167 @@ export function CalendarioMes({ año, mes, vencimientos, onPrev, onNext }: Props
   const esHoy = (dia: number) =>
     hoy.getFullYear() === año && hoy.getMonth() === mes && hoy.getDate() === dia;
 
-  // Build grid cells: empty prefix + days
   const celdas: (number | null)[] = [
-    ...Array(primerDia).fill(null),
+    ...Array(offsetLunes).fill(null),
     ...Array.from({ length: diasEnMes }, (_, i) => i + 1),
   ];
-  // Pad to complete last row
   while (celdas.length % 7 !== 0) celdas.push(null);
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif' }}>
-      {/* Header nav */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      {/* Navegación de mes */}
+      <div style={{
+        padding: '16px 20px',
+        borderBottom: '1px solid #E9E6DE',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
         <button
           onClick={onPrev}
-          style={{
-            background: 'none', border: '1px solid #E5E2D8', borderRadius: 6,
-            padding: '5px 12px', cursor: 'pointer', fontSize: 14, color: '#4B5563',
-          }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5A6478', padding: '4px 8px', borderRadius: 6 }}
         >
-          ‹
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
         </button>
-        <span style={{ fontWeight: 700, fontSize: 15, color: '#131C2E' }}>
+        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 700, color: '#131C2E' }}>
           {MESES[mes]} {año}
-        </span>
+        </h2>
         <button
           onClick={onNext}
-          style={{
-            background: 'none', border: '1px solid #E5E2D8', borderRadius: 6,
-            padding: '5px 12px', cursor: 'pointer', fontSize: 14, color: '#4B5563',
-          }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5A6478', padding: '4px 8px', borderRadius: 6 }}
         >
-          ›
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
         </button>
       </div>
 
-      {/* Day-of-week labels */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
-        {DIAS.map((d) => (
-          <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#8B95A5', padding: '4px 0' }}>
+      {/* Cabecera días */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #E9E6DE' }}>
+        {DIAS_SEMANA.map((d, i) => (
+          <div key={d} style={{
+            padding: '8px 0',
+            textAlign: 'center',
+            fontSize: 11,
+            fontWeight: 600,
+            color: i >= 5 ? '#B0A89C' : '#7B8799',
+          }}>
             {d}
           </div>
         ))}
       </div>
 
-      {/* Calendar grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+      {/* Grilla de celdas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
         {celdas.map((dia, idx) => {
           if (dia === null) {
-            return <div key={`e-${idx}`} style={{ minHeight: 56 }} />;
+            return (
+              <div
+                key={`e-${idx}`}
+                style={{
+                  padding: '8px 6px',
+                  borderRight: '1px solid #F2F0EA',
+                  borderBottom: '1px solid #F2F0EA',
+                  minHeight: 76,
+                  background: '#FAFAF7',
+                }}
+              />
+            );
           }
+
           const fecha = isoFecha(año, mes, dia);
           const items = porFecha.get(fecha) ?? [];
-          const pendientes = items.filter((v) => !v.completado);
-          const completados = items.filter((v) => v.completado);
-          const hoyClass = esHoy(dia);
+          const visible = items.slice(0, 2);
+          const overflow = items.length - 2;
+          const today = esHoy(dia);
+          const selected = dia === selectedDay;
+          const dow = new Date(año, mes, dia).getDay();
+          const isWeekend = dow === 0 || dow === 6;
+
+          const numBg = selected ? '#1B3A6B' : today ? '#E8EDF8' : 'transparent';
+          const numColor = selected ? '#FFFFFF' : today ? '#1B3A6B' : isWeekend ? '#B0A89C' : '#131C2E';
+          const cellBg = selected ? '#F0F4FC' : isWeekend ? '#FAFAF7' : '#FFFFFF';
 
           return (
             <div
               key={dia}
-              title={items.map((v) => `${v.completado ? '✓' : '•'} ${v.descripcion}`).join('\n') || undefined}
+              onClick={() => {
+                if (items.length > 0) onSelectDay(selected ? null : dia);
+              }}
               style={{
-                minHeight: 56, padding: '5px 4px',
-                border: hoyClass ? '2px solid #1B3A6B' : '1px solid #E9E6DE',
-                borderRadius: 7,
-                background: hoyClass ? '#EEF2F9' : '#FAFAF8',
-                cursor: items.length ? 'default' : undefined,
+                padding: '8px 6px',
+                borderRight: '1px solid #F2F0EA',
+                borderBottom: '1px solid #F2F0EA',
+                minHeight: 76,
+                background: cellBg,
+                cursor: items.length > 0 ? 'pointer' : 'default',
+                transition: 'background .1s',
               }}
             >
               <div style={{
-                fontSize: 11, fontWeight: hoyClass ? 700 : 400,
-                color: hoyClass ? '#1B3A6B' : '#4B5563',
-                textAlign: 'right', marginBottom: 3,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                background: numBg,
+                color: numColor,
+                fontSize: 13,
+                fontWeight: (today || items.length > 0 || selected) ? 700 : 400,
+                border: today && !selected ? '2px solid #1B3A6B' : 'none',
               }}>
                 {dia}
               </div>
-              {/* Pending badges */}
-              {pendientes.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  {pendientes.slice(0, 3).map((v) => (
-                    <div
-                      key={v.id}
-                      title={v.descripcion}
-                      style={{
-                        height: 6, width: 6, borderRadius: '50%',
-                        background: '#1B3A6B', flexShrink: 0,
-                      }}
-                    />
-                  ))}
-                  {pendientes.length > 3 && (
-                    <span style={{ fontSize: 9, color: '#1B3A6B', fontWeight: 600 }}>+{pendientes.length - 3}</span>
-                  )}
+              {visible.map((v) => (
+                <div key={v.id} style={chipStyle(v.area_caso, v.completado)}>
+                  {v.descripcion}
+                </div>
+              ))}
+              {overflow > 0 && (
+                <div style={{
+                  display: 'inline-block',
+                  marginTop: 3,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: '#1B3A6B',
+                  background: '#E8EDF8',
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                }}>
+                  +{overflow} más
                 </div>
               )}
-              {/* Completed badges */}
-              {completados.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 2 }}>
-                  {completados.slice(0, 3).map((v) => (
-                    <div
-                      key={v.id}
-                      title={v.descripcion}
-                      style={{
-                        height: 6, width: 6, borderRadius: '50%',
-                        background: '#16A34A', flexShrink: 0,
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-              {/* Inline list for days with items (show on hover via title tooltip) */}
             </div>
           );
         })}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 11, color: '#6B7280' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1B3A6B' }} />
-          Pendiente
+      {/* Leyenda */}
+      <div style={{
+        padding: '10px 16px',
+        borderTop: '1px solid #F2F0EA',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: '#E8EDF8' }} />
+          <span style={{ fontSize: 11, color: '#7B8799' }}>Laboral</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#16A34A' }} />
-          Completado
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: '#E3F5F5' }} />
+          <span style={{ fontSize: 11, color: '#7B8799' }}>ART</span>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: '#E6F4EE' }} />
+          <span style={{ fontSize: 11, color: '#7B8799' }}>Completado</span>
+        </div>
+        <span style={{ fontSize: 11, color: '#B0A89C', marginLeft: 'auto' }}>
+          Hacé clic en un día para ver el detalle
+        </span>
       </div>
     </div>
   );

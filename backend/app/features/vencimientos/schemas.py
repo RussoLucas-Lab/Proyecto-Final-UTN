@@ -22,3 +22,16 @@ class VencimientoResponse(BaseModel):
     completado: bool
     creado_por: int | None
     creado_en: datetime
+
+
+class VencimientoAgendaResponse(BaseModel):
+    """Respuesta enriquecida para la vista de agenda: incluye área del caso."""
+
+    id: int
+    caso_id: int
+    descripcion: str
+    fecha: date
+    completado: bool
+    creado_por: int | None
+    creado_en: datetime
+    area_caso: str  # "LABORAL" | "ART"

@@ -12,3 +12,7 @@ export interface VencimientoResponse {
   creado_por: number | null;
   creado_en: string;
 }
+
+export interface VencimientoAgendaItem extends VencimientoResponse {
+  area_caso: string; // "LABORAL" | "ART"
+}

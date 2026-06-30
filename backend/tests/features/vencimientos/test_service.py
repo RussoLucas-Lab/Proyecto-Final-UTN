@@ -89,22 +89,50 @@ class TestListarVencimientosCaso:
 
 
 class TestListarVencimientosRango:
-    def test_retorna_vencimientos_en_rango(self):
-        mock_v = MagicMock()
+    def _make_row(self, descripcion="Presentar demanda", area_value="LABORAL"):
+        from datetime import datetime
+        v = MagicMock()
+        v.id = 1
+        v.caso_id = 1
+        v.descripcion = descripcion
+        v.fecha = date(2026, 7, 15)
+        v.completado = False
+        v.creado_por = None
+        v.creado_en = datetime(2026, 7, 1)
+        area = MagicMock()
+        area.value = area_value
+        return (v, area)
+
+    def _db_with_rows(self, rows):
         db = MagicMock()
-        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_v]
+        db.query.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = rows
+        return db
+
+    def test_retorna_vencimientos_en_rango(self):
+        row = self._make_row()
+        db = self._db_with_rows([row])
 
         result = listar_vencimientos_rango(date(2026, 7, 1), date(2026, 7, 31), db)
 
-        assert result == [mock_v]
+        assert len(result) == 1
+        assert result[0]["descripcion"] == "Presentar demanda"
+        assert result[0]["area_caso"] == "LABORAL"
 
     def test_retorna_lista_vacia_fuera_de_rango(self):
-        db = MagicMock()
-        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+        db = self._db_with_rows([])
 
         result = listar_vencimientos_rango(date(2025, 1, 1), date(2025, 1, 31), db)
 
         assert result == []
+
+    def test_area_art_se_incluye_correctamente(self):
+        row = self._make_row(descripcion="Comisión médica SRT", area_value="ART")
+        db = self._db_with_rows([row])
+
+        result = listar_vencimientos_rango(date(2026, 7, 1), date(2026, 7, 31), db)
+
+        assert result[0]["area_caso"] == "ART"
+        assert result[0]["descripcion"] == "Comisión médica SRT"
 
 
 # ── completar_vencimiento ─────────────────────────────────────────────────────

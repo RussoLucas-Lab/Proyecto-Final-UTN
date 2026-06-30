@@ -22,6 +22,7 @@ from app.core.dependencies import get_current_user, get_db, require_roles
 from app.core.rate_limit import limiter
 from app.features.auth.models import Usuario
 from app.features.vencimientos.schemas import (
+    VencimientoAgendaResponse,
     VencimientoCompletar,
     VencimientoCreate,
     VencimientoResponse,
@@ -95,7 +96,7 @@ async def get_vencimientos_caso(
 
 @router.get(
     "/vencimientos",
-    response_model=list[VencimientoResponse],
+    response_model=list[VencimientoAgendaResponse],
     status_code=status.HTTP_200_OK,
 )
 @limiter.limit("100/minute")

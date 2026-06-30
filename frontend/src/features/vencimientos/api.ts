@@ -1,5 +1,5 @@
 import { http } from '../../shared/http';
-import type { VencimientoCreate, VencimientoResponse } from './types';
+import type { VencimientoAgendaItem, VencimientoCreate, VencimientoResponse } from './types';
 
 export function crearVencimiento(casoId: number, payload: VencimientoCreate): Promise<VencimientoResponse> {
   return http.post(`/casos/${casoId}/vencimientos`, payload);
@@ -9,7 +9,7 @@ export function listarVencimientosCaso(casoId: number): Promise<VencimientoRespo
   return http.get(`/casos/${casoId}/vencimientos`);
 }
 
-export function listarVencimientosRango(desde: string, hasta: string): Promise<VencimientoResponse[]> {
+export function listarVencimientosRango(desde: string, hasta: string): Promise<VencimientoAgendaItem[]> {
   return http.get(`/vencimientos?desde=${desde}&hasta=${hasta}`);
 }
 

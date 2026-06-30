@@ -51,13 +51,27 @@ def listar_vencimientos_caso(caso_id: int, db: Session) -> list[Vencimiento]:
 
 def listar_vencimientos_rango(
     desde: date, hasta: date, db: Session
-) -> list[Vencimiento]:
-    return (
-        db.query(Vencimiento)
+) -> list[dict]:
+    rows = (
+        db.query(Vencimiento, Caso.area)
+        .join(Caso, Vencimiento.caso_id == Caso.id)
         .filter(Vencimiento.fecha >= desde, Vencimiento.fecha <= hasta)
         .order_by(Vencimiento.fecha.asc())
         .all()
     )
+    return [
+        {
+            "id": v.id,
+            "caso_id": v.caso_id,
+            "descripcion": v.descripcion,
+            "fecha": v.fecha,
+            "completado": v.completado,
+            "creado_por": v.creado_por,
+            "creado_en": v.creado_en,
+            "area_caso": area.value,
+        }
+        for v, area in rows
+    ]
 
 
 def completar_vencimiento(
