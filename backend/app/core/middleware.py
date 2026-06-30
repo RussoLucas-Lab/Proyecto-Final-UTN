@@ -3,6 +3,15 @@ Middlewares de seguridad transversales.
 
 - CSRFMiddleware           → CSRF double-submit cookie (403 si X-CSRF-Token no coincide)
 - SecurityHeadersMiddleware → headers de seguridad en todas las respuestas HTTP
+
+Nota sobre /api/v1/internal/*:
+  Las rutas internas son llamadas server-to-server (n8n → backend). No hay
+  navegador ni sesión de usuario, por lo que el esquema CSRF no aplica.
+  Esas rutas se protegen con el secreto compartido N8N_INTERNAL_SECRET
+  (dependencia `verify_internal_secret` en features/comunicaciones/dependencies.py).
+  El prefijo /api/v1/internal queda exento de CSRF aquí para que futuras
+  mutaciones internas (batch, etc.) no queden accidentalmente sujetas al
+  double-submit cookie de navegador.
 """
 
 import logging
@@ -36,6 +45,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if request.method in _SAFE_METHODS:
+            return await call_next(request)
+
+        # /api/v1/internal/* se protege por secreto compartido, no por CSRF.
+        if request.url.path.startswith("/api/v1/internal"):
             return await call_next(request)
 
         if request.url.path in _CSRF_EXEMPT_PATHS:

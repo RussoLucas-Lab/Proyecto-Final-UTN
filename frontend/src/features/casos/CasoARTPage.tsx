@@ -366,7 +366,9 @@ export default function CasoARTPage() {
         </div>
       </div>
 
-      {showIAModal && <IAModal onClose={() => setShowIAModal(false)} />}
+      {showIAModal && casoId !== undefined && (
+        <IAModal casoId={casoId} onClose={() => setShowIAModal(false)} />
+      )}
 
       {showRetrocederModal && caso.etapa_actual && etapaAnterior && (
         <RetrocederModal

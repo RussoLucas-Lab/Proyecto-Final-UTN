@@ -133,6 +133,12 @@ services:
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:5678/
+      # URL del backend dentro de la red Docker (usada por HTTP Request Tool en WF-01)
+      - BACKEND_URL=${BACKEND_URL:-http://backend:8000}
+      # Secreto compartido para autenticar llamadas internas backend→n8n y n8n→backend
+      - N8N_INTERNAL_SECRET=${N8N_INTERNAL_SECRET}
+      # Permite acceder a variables de entorno ($env) desde expresiones en nodos de workflow
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/home/node/.n8n/workflows

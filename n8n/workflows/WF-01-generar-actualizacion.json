@@ -1,0 +1,147 @@
+{
+  "id": "wf-01-iuris-actualizacion",
+  "name": "WF-01 — Generar Actualización al Cliente",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-01-generar-actualizacion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+    },
+    {
+      "parameters": {
+        "agent": "conversationalAgent",
+        "text": "=Generá una actualización para el caso con ID {{ $json.body.caso_id }}. Usá la herramienta obtener_contexto_caso con {\"caso_id\": {{ $json.body.caso_id }}} para obtener los datos.",
+        "systemMessage": "Sos un asistente jurídico del Estudio Iuris (Argentina). Tu tarea es redactar una actualización clara y empática para el cliente sobre el avance de su caso.\n\nUSA la herramienta 'obtener_contexto_caso' para obtener el contexto del caso antes de redactar.\n\nREGLAS:\n- Redactá en español rioplatense formal pero accesible.\n- Basate SOLO en los datos devueltos por la herramienta; NO inventes datos ni plazos.\n- Si hay novedades, mencionálas brevemente.\n- Si no hay novedades recientes, redactá un mensaje genérico que informe la etapa actual.\n- El mensaje debe ser breve (3-5 oraciones), sin jerga legal innecesaria.\n- NO incluyas instrucciones al abogado ni meta-comentarios.\n- La respuesta debe ser SOLO el texto del mensaje al cliente (sin encabezado JSON ni explicaciones).",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-2345-fabc-456789012345",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [380, 480],
+      "credentials": {
+        "openAiApi": {
+          "id": "GDYNG4kGfvEN0YoB",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/internal/casos/{{ $json.caso_id }}/contexto",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Secret",
+              "value": "={{ $env.N8N_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+      "name": "obtener_contexto_caso",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1,
+      "position": [660, 480],
+      "description": "Herramienta del AI Agent: obtiene datos seguros del caso (cliente, etapa, últimas novedades). Sin DNI/CUIL ni datos sensibles."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ borrador: $node['AI Agent'].json.output }) }}",
+        "options": {}
+      },
+      "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "obtener_contexto_caso": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": ""
+  },
+  "pinData": {},
+  "tags": [
+    {
+      "name": "comunicaciones"
+    }
+  ]
+}
