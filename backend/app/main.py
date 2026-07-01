@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.middleware import CSRFMiddleware, SecurityHeadersMiddleware
 from app.core.rate_limit import limiter
 from app.features.auth.router import router as auth_router
+from app.features.backups.router import router as backups_router
 from app.features.casos.router import router as casos_router
 from app.features.clientes.router import router as clientes_router
 from app.features.comunicaciones.router import router as comunicaciones_router
@@ -120,3 +121,4 @@ app.include_router(comunicaciones_router, prefix="/api/v1")
 app.include_router(documentos_router, prefix="/api/v1")
 app.include_router(telegramas_router, prefix="/api/v1")
 app.include_router(vencimientos_router, prefix="/api/v1")
+app.include_router(backups_router, prefix="/api/v1")

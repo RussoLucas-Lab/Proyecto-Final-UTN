@@ -1,0 +1,358 @@
+{
+  "name": "WF-02 — Respaldo Automático",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3,
+              "triggerAtMinute": 0
+            }
+          ]
+        },
+        "timezone": "America/Argentina/Buenos_Aires"
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [80, 240]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-02-respaldo",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [80, 400],
+      "webhookId": "wf-02-respaldo-manual"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tipo-schedule",
+              "name": "tipo",
+              "value": "AUTOMATICO",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-tipo-automatico",
+      "name": "Set tipo = AUTOMATICO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [280, 240]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tipo-webhook",
+              "name": "tipo",
+              "value": "MANUAL",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-tipo-manual",
+      "name": "Set tipo = MANUAL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [280, 400]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough",
+        "output": "input1"
+      },
+      "id": "merge-triggers",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [480, 320]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.id, c.area, c.creado_en, cl.nombre, cl.dni\nFROM caso c\nJOIN cliente cl ON c.cliente_id = cl.id\nORDER BY c.creado_en DESC",
+        "additionalFields": {}
+      },
+      "id": "postgres-extraer-datos",
+      "name": "Extraer casos y clientes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [680, 320],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Iuris — PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toFile",
+        "fileFormat": "xlsx",
+        "options": {}
+      },
+      "id": "spreadsheet-file",
+      "name": "Generar Excel",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [880, 320]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BACKEND_URL }}/api/v1/internal/storage/presigned-upload",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filename",
+              "value": "=backup_{{ $now.format('yyyy-MM-dd') }}.xlsx"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Secret",
+              "value": "={{ $env.N8N_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-presigned-url",
+      "name": "Obtener URL prefirmada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1080, 320]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.upload_url }}",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "upload-excel-storage",
+      "name": "Subir Excel a Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1280, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/internal/backups",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tipo",
+              "value": "={{ $('Merge').first().json.tipo }}"
+            },
+            {
+              "name": "estado",
+              "value": "OK"
+            },
+            {
+              "name": "ubicacion",
+              "value": "=backup_{{ $now.format('yyyy-MM-dd') }}.xlsx"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Secret",
+              "value": "={{ $env.N8N_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "registrar-backup-ok",
+      "name": "Registrar backup OK",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1480, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/internal/backups",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tipo",
+              "value": "={{ $('Merge').first().json.tipo }}"
+            },
+            {
+              "name": "estado",
+              "value": "ERROR"
+            },
+            {
+              "name": "ubicacion",
+              "value": null
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Secret",
+              "value": "={{ $env.N8N_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "registrar-backup-error",
+      "name": "Registrar backup ERROR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1480, 500]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set tipo = AUTOMATICO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set tipo = MANUAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set tipo = AUTOMATICO": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set tipo = MANUAL": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Extraer casos y clientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer casos y clientes": {
+      "main": [
+        [
+          {
+            "node": "Generar Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Excel": {
+      "main": [
+        [
+          {
+            "node": "Obtener URL prefirmada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener URL prefirmada": {
+      "main": [
+        [
+          {
+            "node": "Subir Excel a Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir Excel a Storage": {
+      "main": [
+        [
+          {
+            "node": "Registrar backup OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "errorWorkflow": "",
+    "onError": "continueErrorOutput"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "versionId": "wf-02-v1",
+  "triggerCount": 2,
+  "tags": [
+    {
+      "createdAt": "2026-07-01T00:00:00.000Z",
+      "updatedAt": "2026-07-01T00:00:00.000Z",
+      "id": "tag-backups",
+      "name": "backups"
+    }
+  ]
+}

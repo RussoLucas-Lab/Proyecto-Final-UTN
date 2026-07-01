@@ -273,15 +273,70 @@ Historial **append-only** del caso en orden cronológico. No existe `DELETE` ni 
 
 ## Telegramas (Laboral)
 
+> **Auth**: JWT en cookie HttpOnly. Mutaciones (`POST`/`PATCH`/`PUT`) protegidas por CSRF double-submit (`X-CSRF-Token`).
+> **RBAC**: `GET` accesible por todo usuario autenticado (RN-08); `POST`/`PATCH`/`PUT` requieren ABOGADO o SOCIO.
+> **Restricción de área**: todos los endpoints de mutación validan que el caso sea de área LABORAL (RN-15).
+
+### GET /casos/{id}/telegramas
+Lista los telegramas del caso ordenados por número. Devuelve lista vacía si no hay ninguno.
+**200** → `list[TelegramaResponse]`. **401** sin sesión. *(RF-25, RN-08)*
+
 ### POST /casos/{id}/telegramas
-Registra un telegrama del caso (solo Laboral, hasta 3).
+Registra un telegrama nuevo en el caso. El resultado inicial siempre es `PENDIENTE` (RN-18).
+
+**Request** (`TelegramaCreate`):
 ```json
-{ "numero": 1, "destinatario": "Acme S.A.", "domicilio_destino": "Av. San Martín 1000", "cuerpo": "Intimo..." }
+{
+  "numero": 1,
+  "tipo_comunicacion": "OTRO",
+  "destinatario": "Acme S.A.",
+  "domicilio_destino": "Av. San Martín 1000, Mendoza",
+  "cuerpo": "Por la presente, intimo a Vuestra Empresa..."
+}
 ```
-**201** → se crea con `resultado = PENDIENTE`. **409** si ya existe ese número. *(RF-25, RN-15, RN-16, RN-18)*
+Valores de `tipo_comunicacion`: `RENUNCIA` · `AUSENCIA` · `OTRO`.
+`numero` debe estar en el rango 1–3; `destinatario`, `domicilio_destino` y `cuerpo` son opcionales.
+
+**201** → `TelegramaResponse` (con `resultado = "PENDIENTE"`).
+**401** sin sesión. **403** sin CSRF o sin rol ABOGADO/SOCIO.
+**404** caso no encontrado.
+**409** número duplicado en el caso (RN-16) o límite de 3 telegramas alcanzado (RN-16).
+**422** caso de área ART (RN-15) o `numero` fuera del rango 1–3. *(RF-25, RN-15, RN-16, RN-18)*
 
 ### PATCH /telegramas/{id}
-Actualiza el resultado de entrega: `{ "resultado": "EN_SUCURSAL" }` (ENTREGADO · RECHAZADO · EN_SUCURSAL · DOMICILIO_INEXISTENTE · CERRADO). *(RF-25, RN-18)*
+Actualiza el resultado de entrega de un telegrama existente.
+
+**Request** (`ResultadoUpdateRequest`):
+```json
+{ "resultado": "EN_SUCURSAL" }
+```
+Valores permitidos: `ENTREGADO` · `RECHAZADO` · `EN_SUCURSAL` · `DOMICILIO_INEXISTENTE` · `CERRADO`.
+El valor `PENDIENTE` no puede asignarse manualmente (es el estado inicial — RN-18).
+
+**200** → `TelegramaResponse`. **401** sin sesión. **403** sin CSRF o sin rol.
+**404** telegrama no encontrado. **422** resultado `PENDIENTE` o valor inválido. *(RF-25, RN-18)*
+
+### PUT /casos/{id}/telegramas/{numero}/resultado
+Upsert del resultado del telegrama número `{numero}` del caso (crea el telegrama si no existe). Mismo rango de valores permitidos que `PATCH`.
+**200** → `TelegramaResponse`. **422** caso no LABORAL, resultado PENDIENTE, o número fuera de 1–3. *(RN-15, RN-18)*
+
+### TelegramaResponse (schema de respuesta)
+```json
+{
+  "id": 5,
+  "caso_id": 12,
+  "numero": 1,
+  "resultado": "PENDIENTE",
+  "tipo_comunicacion": "OTRO",
+  "destinatario": "Acme S.A.",
+  "domicilio_destino": "Av. San Martín 1000, Mendoza",
+  "cuerpo": "Por la presente, intimo...",
+  "codigo_seguimiento": null,
+  "fecha_envio": null,
+  "fecha_resultado": null
+}
+```
+`resultado` puede ser: `PENDIENTE` · `ENTREGADO` · `RECHAZADO` · `EN_SUCURSAL` · `DOMICILIO_INEXISTENTE` · `CERRADO`.
 
 ## Documentos
 
@@ -388,15 +443,74 @@ Resuelve `comunicacion → caso → cliente/etapa`; `preview` es el contenido co
 
 ## Respaldos
 
-### POST /backups  (rol SOCIO)
-Ejecuta respaldo manual. *(RF-21)*
+> **Auth**: JWT en cookie HttpOnly. `GET /backups` y `POST /backups` exclusivos de SOCIO (D6, RF-22).
+> `POST /internal/backups` protegido por `X-Internal-Secret`; sin cookie JWT ni CSRF (llamada server-to-server de n8n).
 
 ### GET /backups
-Historial de respaldos.
+Historial de respaldos ordenado por fecha DESC. Solo SOCIO. *(RF-22, D6)*
+
+**Response 200** → `list[BackupResponse]`
 ```json
-[ { "fecha": "2026-06-15", "tipo": "AUTOMATICO", "estado": "OK" } ]
+[
+  { "id": 3, "fecha": "2026-07-01T03:00:00Z", "tipo": "AUTOMATICO", "estado": "OK",    "ubicacion": "backup_2026-07-01.xlsx" },
+  { "id": 2, "fecha": "2026-06-30T03:00:00Z", "tipo": "AUTOMATICO", "estado": "OK",    "ubicacion": "backup_2026-06-30.xlsx" },
+  { "id": 1, "fecha": "2026-06-29T12:45:00Z", "tipo": "MANUAL",    "estado": "ERROR",  "ubicacion": null }
+]
 ```
-*(RF-22, RN-13)*
+**401** sin sesión. **403** sin rol SOCIO. *(RF-22, RN-13)*
+
+### POST /backups
+Dispara un respaldo manual vía n8n WF-02 (fire-and-forget). Solo SOCIO. *(RF-21, D1)*
+
+No ejecuta el respaldo directamente: llama al webhook de WF-02 y devuelve `202 Accepted`. n8n ejecuta en background y al finalizar llama a `POST /internal/backups` para registrar el resultado.
+
+**Response 202** → `BackupTriggerResponse`
+```json
+{ "mensaje": "Respaldo manual iniciado. El resultado quedará registrado en el historial." }
+```
+**401** sin sesión. **403** sin rol SOCIO o sin CSRF. **503** si n8n no está disponible (el respaldo NO se registra como fallido — nunca llegó). *(RF-21)*
+
+CSRF: validado por CSRFMiddleware (POST de navegador).
+
+### POST /internal/backups  (uso interno — n8n WF-02)
+Registra el resultado de un respaldo ejecutado por n8n. Llamado por WF-02 al finalizar (exitoso o fallido). *(RF-21, D2)*
+
+**Request** (`BackupRegistrarRequest`):
+```json
+{ "tipo": "AUTOMATICO", "estado": "OK", "ubicacion": "backup_2026-07-01.xlsx", "fecha": null }
+```
+`tipo`: `AUTOMATICO` | `MANUAL`. `estado`: `OK` | `ERROR`. `ubicacion`: path del archivo en storage (null si falló). `fecha`: opcional, default `now()`.
+
+**Response 201** → `BackupResponse`
+```json
+{ "id": 3, "fecha": "2026-07-01T03:01:42Z", "tipo": "AUTOMATICO", "estado": "OK", "ubicacion": "backup_2026-07-01.xlsx" }
+```
+**401** secreto ausente o inválido. **422** `tipo`/`estado` fuera de sus enums.
+
+Auth: `X-Internal-Secret`. Sin cookie JWT, sin CSRF, sin RBAC.
+
+### BackupResponse (schema de respuesta)
+```json
+{
+  "id": 3,
+  "fecha": "2026-07-01T03:00:00Z",
+  "tipo": "AUTOMATICO",
+  "estado": "OK",
+  "ubicacion": "backup_2026-07-01.xlsx"
+}
+```
+`tipo`: `AUTOMATICO` | `MANUAL`. `estado`: `OK` | `ERROR`. `ubicacion`: `null` si el backup falló.
+
+### GET /internal/storage/presigned-upload?filename={filename}  (uso interno — n8n WF-02)
+Devuelve una URL prefirmada de subida (PUT) para que n8n pueda cargar el Excel de respaldo directamente a MinIO/R2 sin credenciales propias (D4).
+
+**Response 200**
+```json
+{ "upload_url": "https://<endpoint>/backups/backup_2026-07-01.xlsx?...", "object_key": "backups/backup_2026-07-01.xlsx" }
+```
+**401** secreto ausente o inválido.
+
+Auth: `X-Internal-Secret`. La URL prefirmada expira en 3600 segundos.
 
 ## Vencimientos / agenda
 

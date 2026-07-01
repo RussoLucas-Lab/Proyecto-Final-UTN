@@ -41,3 +41,14 @@ class DocumentoResponse(BaseModel):
 class DocumentoDownloadResponse(BaseModel):
     download_url: str
     expires_in: int
+
+
+class StoragePresignedUploadResponse(BaseModel):
+    """Respuesta de GET /internal/storage/presigned-upload.
+
+    Usada por n8n WF-02 para subir el Excel de respaldo directamente a storage
+    sin necesitar credenciales propias de MinIO/R2 (D4).
+    """
+
+    upload_url: str
+    object_key: str

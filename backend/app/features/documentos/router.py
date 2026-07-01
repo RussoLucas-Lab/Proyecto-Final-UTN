@@ -30,7 +30,9 @@ from app.features.documentos.schemas import (
     DocumentoInitResponse,
     DocumentoRegisterRequest,
     DocumentoResponse,
+    StoragePresignedUploadResponse,
 )
+from app.features.comunicaciones.dependencies import verify_internal_secret
 from app.features.documentos.service import (
     CasoNoEncontrado,
     DocumentoNoEncontrado,
@@ -167,3 +169,33 @@ async def get_documento_url(
         return get_download_url(documento_id, storage, db)
     except DocumentoNoEncontrado:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+
+
+# ── GET /internal/storage/presigned-upload ────────────────────────────────────
+
+
+@router.get(
+    "/internal/storage/presigned-upload",
+    response_model=StoragePresignedUploadResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_internal_presigned_upload(
+    filename: str,
+    storage: StorageClient = Depends(get_storage_client),
+    _: None = Depends(verify_internal_secret),
+) -> StoragePresignedUploadResponse:
+    """URL prefirmada de subida para n8n (WF-02, D4).
+
+    Permite que n8n suba el Excel de respaldo directamente a MinIO/R2 sin
+    necesitar credenciales propias de storage. El backend actúa como proxy
+    de autenticación.
+
+    - 200: StoragePresignedUploadResponse { upload_url, object_key }
+    - 401: secreto X-Internal-Secret ausente o inválido
+
+    Auth: secreto compartido X-Internal-Secret (NO cookie JWT).
+    CSRF: exento (prefijo /internal en CSRFMiddleware + método GET).
+    """
+    object_key = f"backups/{filename}"
+    upload_url = storage.generate_presigned_url("put_object", object_key, expires_in=3600)
+    return StoragePresignedUploadResponse(upload_url=upload_url, object_key=object_key)

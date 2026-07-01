@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # ── n8n / Webhooks ─────────────────────────────────────────────
     # use real secret: openssl rand -hex 32
     N8N_WF01_WEBHOOK_URL: str = "http://n8n:5678/webhook/wf-01-generar-actualizacion"
+    N8N_WF02_WEBHOOK_URL: str = "http://n8n:5678/webhook/wf-02-respaldo"
     N8N_INTERNAL_SECRET: str = "change-me-use-openssl-rand-hex-32"
     # El AI Agent hace tool-calling (LLM -> tool HTTP -> LLM); 60s da margen
     # razonable antes de considerar el servicio de IA no disponible.

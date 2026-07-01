@@ -48,6 +48,14 @@
       "sessions": 0,
       "memories": 1,
       "prompts": 0
+    },
+    {
+      "id": "1252419e",
+      "created_by": "camil",
+      "created_at": "2026-07-01T23:19:50Z",
+      "sessions": 0,
+      "memories": 5,
+      "prompts": 0
     }
   ]
 }
