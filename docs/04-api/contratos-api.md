@@ -329,22 +329,62 @@ Endpoint **de solo lectura** que el nodo AI Agent de n8n consume como herramient
 ```
 *(soporta RF-16; el backend no contiene lógica de IA)*
 
-### Batch de actualizaciones (WF-05)
-Endpoints internos (uso de n8n, protegidos por secreto):
-- `GET /internal/casos/pendientes-actualizacion` — devuelve los `caso_id` activos que cumplen 15 días desde su última actualización (cadencia calculada por el backend). *(RF-26.1)*
-- `POST /internal/casos/{id}/comunicaciones` — persiste un borrador generado.
-```json
-{ "contenido": "Buenos días, ...", "tipo": "ACTUALIZACION_AUTOMATICA" }
-```
-→ se crea en estado `PENDIENTE_REVISION`. *(RF-26.3, RN-19)*
+### Batch de actualizaciones (WF-05, RF-26, change `comunicaciones-2`)
+Endpoints internos (uso de n8n, protegidos por el secreto compartido `X-Internal-Secret`; sin cookie JWT ni CSRF — D3):
 
-Endpoints de usuario:
-- `GET /comunicaciones?estado=PENDIENTE_REVISION` — borradores para el dashboard. *(RF-26.4)*
-- `PATCH /comunicaciones/{id}` — aprobar o descartar.
+#### GET /internal/casos/pendientes-actualizacion
+Devuelve los `caso_id` que "vencen" hoy: etapa actual NO terminal (RN-20) + sin borrador automático `PENDIENTE_REVISION` ya pendiente (idempotencia, RN-22) + ≥15 días desde la última `comunicacion` `ACTUALIZACION_AUTOMATICA` `APROBADO` (o desde `caso.fecha_inicio`/`caso.creado_en` si nunca hubo una, RN-21). La cadencia se calcula en el backend, no en n8n (D1).
+**Response 200**
 ```json
-{ "estado": "APROBADO" }   // o "DESCARTADO"
+{ "casos_pendientes": [12, 45, 88] }
 ```
-El envío al cliente (WhatsApp) es una acción externa y manual (RN-10).
+**401** sin secreto o secreto inválido. *(RF-26.1)*
+
+#### POST /internal/casos/{id}/comunicaciones
+Persiste el borrador generado por el AI Agent de WF-05.
+**Request**
+```json
+{ "contenido": "Buenos días, le informamos que su caso avanzó a la etapa de Conciliación..." }
+```
+**Response 201**
+```json
+{ "id": 101, "estado": "PENDIENTE_REVISION", "generado_en": "2026-07-01T07:00:03Z" }
+```
+Se crea `comunicacion(tipo=ACTUALIZACION_AUTOMATICA, estado=PENDIENTE_REVISION)`. No envía nada al cliente (RN-19).
+**404** caso inexistente. **409** ya existe un borrador automático `PENDIENTE_REVISION` para el caso (idempotencia, RN-22). *(RF-26.2)*
+
+Endpoints de usuario (cookie JWT; `PATCH` requiere además rol ABOGADO/SOCIO + CSRF):
+
+#### GET /comunicaciones?estado={estado}
+`estado` es opcional y se valida contra `EstadoComunicacion` (`PENDIENTE_REVISION`/`APROBADO`/`DESCARTADO`); si se omite, devuelve todos. Todo usuario autenticado puede leer (RN-08).
+**Response 200**
+```json
+[
+  {
+    "id": 101,
+    "caso_id": 12,
+    "cliente": "Juan Pérez",
+    "area": "LABORAL",
+    "etapa": "Conciliación",
+    "preview": "Buenos días, le informamos que su caso avanzó a la etapa de Conciliación...",
+    "estado": "PENDIENTE_REVISION",
+    "generado_en": "2026-07-01T07:00:03Z"
+  }
+]
+```
+Resuelve `comunicacion → caso → cliente/etapa`; `preview` es el contenido completo (no truncado). Sin DNI/CUIL ni montos (ADR-0004). **401** sin sesión. **422** `estado` fuera de `EstadoComunicacion`. *(RF-26.4)*
+
+#### PATCH /comunicaciones/{id}
+**Request**
+```json
+{ "estado": "APROBADO" }   // o "DESCARTADO" — único rango permitido
+```
+**Response 200**
+```json
+{ "id": 101, "estado": "APROBADO", "aprobado_por": 4, "aprobado_en": "2026-07-01T09:12:30Z" }
+```
+`APROBADO` setea `aprobado_por`/`aprobado_en=now()` y **reinicia la ventana de cadencia de 15 días** del caso (D4) — es el insumo directo de `GET /internal/casos/pendientes-actualizacion`. `DESCARTADO` solo cambia el estado. El envío al cliente (WhatsApp) siempre es una acción externa y manual (RN-10, RN-19).
+**403** sin rol ABOGADO/SOCIO o sin CSRF. **404** comunicación inexistente. **409** ya estaba revisada (no en `PENDIENTE_REVISION`). **422** `estado` fuera de `{APROBADO, DESCARTADO}`. *(RF-26.4)*
 
 ## Respaldos
 

@@ -139,6 +139,10 @@ services:
       - N8N_INTERNAL_SECRET=${N8N_INTERNAL_SECRET}
       # Permite acceder a variables de entorno ($env) desde expresiones en nodos de workflow
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      # Zona horaria del estudio: el Schedule Trigger de WF-05 (07:00 diario)
+      # se evalúa en esta tz de instancia, no en UTC (RF-26, comunicaciones-2).
+      - GENERIC_TIMEZONE=America/Argentina/Buenos_Aires
+      - TZ=America/Argentina/Buenos_Aires
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/home/node/.n8n/workflows
