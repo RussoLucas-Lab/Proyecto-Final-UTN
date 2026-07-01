@@ -1,5 +1,4 @@
 {
-  "id": "wf-01-iuris-actualizacion",
   "name": "WF-01 — Generar Actualización al Cliente",
   "nodes": [
     {
@@ -9,68 +8,62 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "id": "webhook-trigger",
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [240, 300],
-      "webhookId": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+      "typeVersion": 1,
+      "position": [
+        176,
+        304
+      ],
+      "webhookId": "34b15132-71e3-42a0-bb2c-a6ea427cc4d7"
     },
     {
       "parameters": {
-        "agent": "conversationalAgent",
         "text": "=Generá una actualización para el caso con ID {{ $json.body.caso_id }}. Usá la herramienta obtener_contexto_caso con {\"caso_id\": {{ $json.body.caso_id }}} para obtener los datos.",
-        "systemMessage": "Sos un asistente jurídico del Estudio Iuris (Argentina). Tu tarea es redactar una actualización clara y empática para el cliente sobre el avance de su caso.\n\nUSA la herramienta 'obtener_contexto_caso' para obtener el contexto del caso antes de redactar.\n\nREGLAS:\n- Redactá en español rioplatense formal pero accesible.\n- Basate SOLO en los datos devueltos por la herramienta; NO inventes datos ni plazos.\n- Si hay novedades, mencionálas brevemente.\n- Si no hay novedades recientes, redactá un mensaje genérico que informe la etapa actual.\n- El mensaje debe ser breve (3-5 oraciones), sin jerga legal innecesaria.\n- NO incluyas instrucciones al abogado ni meta-comentarios.\n- La respuesta debe ser SOLO el texto del mensaje al cliente (sin encabezado JSON ni explicaciones).",
         "options": {
+          "systemMessage": "=\"Sos un asistente jurídico del Estudio Iuris (Argentina). \nTu tarea es redactar una actualización clara y empática para el cliente sobre el avance de su caso.\\n\\nUSA la herramienta 'obtener_contexto_caso' para obtener el contexto del caso antes de redactar.\\n\\nREGLAS:\\n- Redactá en español rioplatense formal pero accesible.\\n- Basate SOLO en los datos devueltos por la herramienta; NO inventes datos ni plazos.\\n- Si hay novedades, mencionálas brevemente.\\n- Si no hay novedades recientes, redactá un mensaje genérico que informe la etapa actual.\\n- El mensaje debe ser breve (3-5 oraciones), sin jerga legal innecesaria.\\n- NO incluyas instrucciones al abogado ni meta-comentarios.\\n- La respuesta debe ser SOLO el texto del mensaje al cliente (sin encabezado JSON ni explicaciones).\"",
           "returnIntermediateSteps": false
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "IA_API_KEY",
+            "name": "OpenAI — Iuris IA"
+          }
         }
       },
-      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "id": "ai-agent",
       "name": "AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1,
-      "position": [520, 300]
+      "position": [
+        624,
+        304
+      ]
     },
     {
       "parameters": {
-        "model": "gpt-4o-mini",
-        "options": {}
-      },
-      "id": "f6a7b8c9-d0e1-2345-fabc-456789012345",
-      "name": "OpenAI Chat Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1,
-      "position": [380, 480],
-      "credentials": {
-        "openAiApi": {
-          "id": "GDYNG4kGfvEN0YoB",
-          "name": "OpenAI account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $env.BACKEND_URL }}/api/v1/internal/casos/{{ $json.caso_id }}/contexto",
+        "toolDescription": "Obtiene toda la información de un caso jurídico a partir de su ID, incluyendo datos del cliente, estado, actuaciones, documentos y contexto necesario para generar actualizaciones.",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/internal/casos/{{ $('Webhook Trigger').first().json.body.caso_id }}/contexto",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "parametersHeaders": {
+          "values": [
             {
-              "name": "X-Internal-Secret",
-              "value": "={{ $env.N8N_INTERNAL_SECRET }}"
+              "name": "x-internal-secret",
+              "valueProvider": "fieldValue",
+              "value": "={{ $('Set Internal Secret').first().json.internal_secret }}"
             }
           ]
-        },
-        "options": {
-          "timeout": 10000
         }
       },
-      "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+      "id": "http-tool-contexto",
       "name": "obtener_contexto_caso",
       "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
       "typeVersion": 1,
-      "position": [660, 480],
-      "description": "Herramienta del AI Agent: obtiene datos seguros del caso (cliente, etapa, últimas novedades). Sin DNI/CUIL ni datos sensibles."
+      "position": [
+        768,
+        528
+      ]
     },
     {
       "parameters": {
@@ -78,19 +71,104 @@
         "responseBody": "={{ JSON.stringify({ borrador: $node['AI Agent'].json.output }) }}",
         "options": {}
       },
-      "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
+      "id": "respond-webhook",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [800, 300]
+      "position": [
+        976,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "gpt-5.2"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        640,
+        528
+      ],
+      "id": "e81bc6ba-fbbd-4d6d-9616-2dfa071b4964",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "qO5IlVfLzTenhqWc",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cd58a62c-92c3-4d62-abdc-8a356803c1bf",
+              "name": "internal_secret",
+              "value": "={{ $env.N8N_INTERNAL_SECRET }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-internal-secret",
+      "name": "Set Internal Secret",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Actualización Individual de Cliente",
+        "height": 80,
+        "width": 432,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -160
+      ],
+      "id": "fa774a13-756d-4e06-9e36-a0a0b1572100",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Este flujo de n8n expone un webhook que recibe el identificador de un caso y genera, mediante un agente de inteligencia artificial, una actualización clara y empática para el cliente sobre el estado de su expediente.\n\nPara ello, el agente consulta previamente el contexto del caso a través de una herramienta interna, redacta el mensaje basándose únicamente en esa información y devuelve el resultado como un borrador en formato JSON, listo para ser revisado o utilizado por otros procesos del sistema.",
+        "height": 208,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -80
+      ],
+      "id": "24c350d7-e67f-4490-a79c-e555647a22ee",
+      "name": "Sticky Note1"
     }
   ],
+  "pinData": {},
   "connections": {
     "Webhook Trigger": {
       "main": [
         [
           {
-            "node": "AI Agent",
+            "node": "Set Internal Secret",
             "type": "main",
             "index": 0
           }
@@ -108,6 +186,17 @@
         ]
       ]
     },
+    "obtener_contexto_caso": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "OpenAI Chat Model": {
       "ai_languageModel": [
         [
@@ -119,28 +208,36 @@
         ]
       ]
     },
-    "obtener_contexto_caso": {
-      "ai_tool": [
+    "Set Internal Secret": {
+      "main": [
         [
           {
             "node": "AI Agent",
-            "type": "ai_tool",
+            "type": "main",
             "index": 0
           }
         ]
       ]
     }
   },
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
   },
-  "staticData": null,
+  "versionId": "a96204a6-164a-41b4-8dc4-04382b745bb9",
   "meta": {
-    "instanceId": ""
+    "instanceId": "badfc19f79ec85bbc06bbd24aad446a15774e8b5b50c3ef2a01a057812572224",
+    "templateCredsSetupCompleted": true
   },
-  "pinData": {},
+  "id": "wf-01-iuris-actualizacion",
   "tags": [
     {
+      "updatedAt": "2026-06-30T20:37:21.511Z",
+      "createdAt": "2026-06-30T20:37:21.511Z",
+      "id": "bF1wZ2reKE9KJLhT",
       "name": "comunicaciones"
     }
   ]
