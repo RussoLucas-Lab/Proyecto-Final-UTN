@@ -10,8 +10,8 @@ Estructura:
   caso_fixture             — caso sintético vinculado a cliente + abogado + etapa
   client                   — TestClient con dependency_overrides de get_db
   client_no_db             — TestClient con DB simulada (para 401/403 sin PostgreSQL)
-  mock_n8n_ok              — monkeypatch httpx.post para simular n8n exitoso
-  mock_n8n_down            — monkeypatch httpx.post para simular n8n caído
+  mock_n8n_ok              — monkeypatch httpx.AsyncClient para simular n8n exitoso
+  mock_n8n_down            — monkeypatch httpx.AsyncClient para simular n8n caído
 
 Tests de integración (@pytest.mark.integration) requieren TEST_DATABASE_URL o DATABASE_URL.
 Tests sin DB (401/403) usan client_no_db y corren en cualquier entorno.
@@ -19,7 +19,7 @@ Tests sin DB (401/403) usan client_no_db y corren en cualquier entorno.
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -371,25 +371,39 @@ def client_no_db(_test_app):
 # ── Mocks de n8n ──────────────────────────────────────────────────────────────
 
 
+def _fake_async_client(post_return=None, post_side_effect=None):
+    """Doble de httpx.AsyncClient usable como 'async with httpx.AsyncClient(...) as client'."""
+    client = MagicMock()
+    client.post = AsyncMock(return_value=post_return, side_effect=post_side_effect)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
+
+
 @pytest.fixture
 def mock_n8n_ok():
-    """Monkeypatch de httpx.post: simula n8n respondiendo con un borrador."""
+    """Monkeypatch de httpx.AsyncClient: simula n8n respondiendo con un borrador."""
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"borrador": "Estimado cliente, su caso ha avanzado."}
     mock_response.raise_for_status = MagicMock()
 
-    with patch("app.features.comunicaciones.service.httpx.post", return_value=mock_response) as m:
+    fake_client = _fake_async_client(post_return=mock_response)
+    with patch(
+        "app.features.comunicaciones.service.httpx.AsyncClient",
+        return_value=fake_client,
+    ) as m:
         yield m
 
 
 @pytest.fixture
 def mock_n8n_down():
-    """Monkeypatch de httpx.post: simula n8n caído (ConnectError)."""
+    """Monkeypatch de httpx.AsyncClient: simula n8n caído (ConnectError)."""
     import httpx as _httpx
 
+    fake_client = _fake_async_client(post_side_effect=_httpx.ConnectError("Connection refused"))
     with patch(
-        "app.features.comunicaciones.service.httpx.post",
-        side_effect=_httpx.ConnectError("Connection refused"),
+        "app.features.comunicaciones.service.httpx.AsyncClient",
+        return_value=fake_client,
     ) as m:
         yield m

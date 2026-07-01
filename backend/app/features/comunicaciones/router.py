@@ -76,7 +76,7 @@ async def post_actualizacion(
     CSRF: validado por CSRFMiddleware (double-submit cookie, POST de navegador).
     """
     try:
-        return disparar_actualizacion(caso_id, db)
+        return await disparar_actualizacion(caso_id, db)
     except CasoNoEncontrado:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

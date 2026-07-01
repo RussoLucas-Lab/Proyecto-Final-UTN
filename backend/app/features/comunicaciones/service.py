@@ -28,8 +28,6 @@ from app.shared.enums import EstadoComunicacion, TipoComunicacion
 
 logger = logging.getLogger("iuris.comunicaciones")
 
-_WEBHOOK_TIMEOUT = 20.0  # segundos; configurable en .env si hace falta
-
 
 # ── Excepciones del dominio ───────────────────────────────────────────────────
 
@@ -45,7 +43,7 @@ class ServicioIANoDisponible(Exception):
 # ── Funciones de servicio ─────────────────────────────────────────────────────
 
 
-def disparar_actualizacion(caso_id: int, db: Session) -> Comunicacion:
+async def disparar_actualizacion(caso_id: int, db: Session) -> Comunicacion:
     """Dispara WF-01 en n8n y persiste el borrador como Comunicacion.
 
     - Valida que el caso exista (CasoNoEncontrado si no).
@@ -54,17 +52,23 @@ def disparar_actualizacion(caso_id: int, db: Session) -> Comunicacion:
       utilizable → lanza ServicioIANoDisponible (sin persistir nada).
     - Con respuesta válida persiste Comunicacion(tipo=MANUAL, estado=PENDIENTE_REVISION)
       y la retorna. No envía nada al cliente (RN-10).
+
+    Usa httpx.AsyncClient (no el cliente síncrono): el AI Agent de n8n le hace
+    un callback a este mismo backend (GET /internal/casos/{id}/contexto)
+    mientras esta función espera su respuesta. Con una llamada síncrona se
+    bloquea el único event loop de Uvicorn y ese callback queda esperando
+    a que el propio request que lo generó termine (autocontención ~1 min).
     """
     caso = db.get(Caso, caso_id)
     if caso is None:
         raise CasoNoEncontrado(f"caso {caso_id} no encontrado")
 
     try:
-        resp = httpx.post(
-            settings.N8N_WF01_WEBHOOK_URL,
-            json={"caso_id": caso_id},
-            timeout=_WEBHOOK_TIMEOUT,
-        )
+        async with httpx.AsyncClient(timeout=settings.N8N_WEBHOOK_TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                settings.N8N_WF01_WEBHOOK_URL,
+                json={"caso_id": caso_id},
+            )
         resp.raise_for_status()
         data = resp.json()
         texto: str = (

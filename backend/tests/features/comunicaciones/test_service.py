@@ -28,9 +28,9 @@ pytestmark = pytest.mark.integration
 # ── disparar_actualizacion ────────────────────────────────────────────────────
 
 
-def test_disparar_actualizacion_exito(db_session, caso_fixture, mock_n8n_ok):
+async def test_disparar_actualizacion_exito(db_session, caso_fixture, mock_n8n_ok):
     """Éxito: crea Comunicacion con tipo=MANUAL, estado=PENDIENTE_REVISION."""
-    resultado = disparar_actualizacion(caso_fixture.id, db_session)
+    resultado = await disparar_actualizacion(caso_fixture.id, db_session)
 
     assert resultado.id is not None
     assert resultado.tipo == TipoComunicacion.MANUAL
@@ -42,7 +42,7 @@ def test_disparar_actualizacion_exito(db_session, caso_fixture, mock_n8n_ok):
     assert resultado.aprobado_en is None
 
 
-def test_disparar_actualizacion_no_persiste_si_n8n_down(db_session, caso_fixture, mock_n8n_down):
+async def test_disparar_actualizacion_no_persiste_si_n8n_down(db_session, caso_fixture, mock_n8n_down):
     """n8n caído → ServicioIANoDisponible; no persiste ninguna Comunicacion."""
     from sqlalchemy import select
     from app.features.comunicaciones.models import Comunicacion
@@ -52,7 +52,7 @@ def test_disparar_actualizacion_no_persiste_si_n8n_down(db_session, caso_fixture
     ).scalars().all()
 
     with pytest.raises(ServicioIANoDisponible):
-        disparar_actualizacion(caso_fixture.id, db_session)
+        await disparar_actualizacion(caso_fixture.id, db_session)
 
     count_despues = db_session.execute(
         select(Comunicacion).where(Comunicacion.caso_id == caso_fixture.id)
@@ -61,26 +61,29 @@ def test_disparar_actualizacion_no_persiste_si_n8n_down(db_session, caso_fixture
     assert len(count_despues) == len(count_antes)
 
 
-def test_disparar_actualizacion_caso_inexistente(db_session, mock_n8n_ok):
+async def test_disparar_actualizacion_caso_inexistente(db_session, mock_n8n_ok):
     """caso_id que no existe → CasoNoEncontrado (no dispara el webhook)."""
     with pytest.raises(CasoNoEncontrado):
-        disparar_actualizacion(99999, db_session)
+        await disparar_actualizacion(99999, db_session)
 
     mock_n8n_ok.assert_not_called()
 
 
-def test_disparar_actualizacion_n8n_sin_texto(db_session, caso_fixture):
+async def test_disparar_actualizacion_n8n_sin_texto(db_session, caso_fixture):
     """n8n responde 200 pero sin texto utilizable → ServicioIANoDisponible."""
     from unittest.mock import MagicMock, patch
+
+    from tests.features.comunicaciones.conftest import _fake_async_client
 
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {}
     mock_response.raise_for_status = MagicMock()
 
-    with patch("app.features.comunicaciones.service.httpx.post", return_value=mock_response):
+    fake_client = _fake_async_client(post_return=mock_response)
+    with patch("app.features.comunicaciones.service.httpx.AsyncClient", return_value=fake_client):
         with pytest.raises(ServicioIANoDisponible):
-            disparar_actualizacion(caso_fixture.id, db_session)
+            await disparar_actualizacion(caso_fixture.id, db_session)
 
 
 # ── obtener_contexto_caso ─────────────────────────────────────────────────────
