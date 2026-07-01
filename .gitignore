@@ -20,3 +20,8 @@ docker-compose.override.yml
 # ── Logs ───────────────────────────────────────────────────────
 *.log
 logs/
+
+# ── Artefactos de pruebas locales ────────────────────────────────
+cookies.txt
+*.sqlite
+*.sqlite3
