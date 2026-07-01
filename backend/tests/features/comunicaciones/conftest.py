@@ -44,14 +44,15 @@ from tests.fixtures.usuarios import (
     hash_test_password,
 )
 
-
 # ── Reset del rate limiter ─────────────────────────────────────────────────────
 
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter():
     try:
-        storage = _rate_limiter._limiter._storage
+        # slowapi expone el storage de `limits` en `.storage` (no `._storage`,
+        # que no existe y hacía que este reset fuera un no-op silencioso).
+        storage = _rate_limiter._limiter.storage
         if hasattr(storage, "reset"):
             storage.reset()
         elif hasattr(storage, "_storage") and isinstance(storage._storage, dict):
@@ -182,10 +183,12 @@ def comunicaciones_db_engine(db_url):
     yield engine
 
     with engine.begin() as conn:
-        conn.execute(text(
-            "TRUNCATE comunicacion, vencimiento, caso, transicion_etapa, etapa, "
-            "cliente, refresh_token, usuario RESTART IDENTITY CASCADE"
-        ))
+        conn.execute(
+            text(
+                "TRUNCATE comunicacion, vencimiento, caso, transicion_etapa, etapa, "
+                "cliente, refresh_token, usuario RESTART IDENTITY CASCADE"
+            )
+        )
     engine.dispose()
 
 
@@ -203,10 +206,15 @@ def db_session(comunicaciones_db_engine) -> Session:
     yield session
     session.close()
     with comunicaciones_db_engine.begin() as conn:
-        conn.execute(text(
-            "TRUNCATE comunicacion, vencimiento, caso, "
-            "cliente, refresh_token, usuario RESTART IDENTITY CASCADE"
-        ))
+        # etapa/transicion_etapa se truncan también por test: etapa_fixture y
+        # etapa_terminal_fixture insertan filas con (area, nombre) fijo y
+        # violarían la unique constraint en el siguiente test si no se limpian.
+        conn.execute(
+            text(
+                "TRUNCATE comunicacion, vencimiento, caso, transicion_etapa, etapa, "
+                "cliente, refresh_token, usuario RESTART IDENTITY CASCADE"
+            )
+        )
 
 
 # ── Fixtures de datos ─────────────────────────────────────────────────────────
@@ -310,6 +318,104 @@ def comunicacion_fixture(db_session: Session, caso_fixture):
     db_session.commit()
     db_session.refresh(com)
     return com
+
+
+# ── Fixtures para el batch (WF-05, RF-26) ──────────────────────────────────────
+
+
+@pytest.fixture
+def etapa_terminal_fixture(db_session: Session):
+    """Etapa terminal (LABORAL) — casos en esta etapa NO son 'activos' (RN-20)."""
+    from app.features.casos.models import Etapa
+    from app.shared.enums import AreaDerecho, FaseCaso
+
+    etapa = Etapa(
+        area=AreaDerecho.LABORAL,
+        fase=FaseCaso.JUDICIAL,
+        nombre="Sentencia",
+        orden=9,
+        es_terminal=True,
+    )
+    db_session.add(etapa)
+    db_session.commit()
+    db_session.refresh(etapa)
+    return etapa
+
+
+@pytest.fixture
+def caso_factory(db_session: Session, usuario_abogado):
+    """Factory de casos sintéticos, cada uno con su propio cliente (DNI único).
+
+    Uso: caso_factory(etapa, fecha_inicio=None, creado_en=None).
+    """
+    from app.features.casos.models import Caso
+    from app.features.clientes.models import Cliente
+    from app.shared.enums import AreaDerecho
+
+    contador = {"n": 0}
+
+    def _crear(etapa, fecha_inicio=None, creado_en=None, area=AreaDerecho.LABORAL):
+        contador["n"] += 1
+        cliente = Cliente(
+            nombre=f"Cliente Batch {contador['n']}",
+            dni=f"40{contador['n']:06d}",
+        )
+        db_session.add(cliente)
+        db_session.commit()
+        db_session.refresh(cliente)
+
+        caso = Caso(
+            cliente_id=cliente.id,
+            abogado_responsable_id=usuario_abogado.id,
+            area=area,
+            etapa_actual_id=etapa.id,
+            fecha_inicio=fecha_inicio,
+            codigo_expediente=f"EXP-BATCH-{contador['n']:03d}",
+        )
+        if creado_en is not None:
+            caso.creado_en = creado_en
+        db_session.add(caso)
+        db_session.commit()
+        db_session.refresh(caso)
+        return caso
+
+    return _crear
+
+
+@pytest.fixture
+def comunicacion_factory(db_session: Session):
+    """Factory de Comunicacion con control total de tipo/estado/fechas.
+
+    Uso: comunicacion_factory(caso_id, tipo=..., estado=..., aprobado_en=..., ...).
+    """
+    from app.features.comunicaciones.models import Comunicacion
+    from app.shared.enums import EstadoComunicacion, TipoComunicacion
+
+    def _crear(
+        caso_id,
+        tipo=TipoComunicacion.ACTUALIZACION_AUTOMATICA,
+        estado=EstadoComunicacion.PENDIENTE_REVISION,
+        contenido="Borrador automático de prueba.",
+        aprobado_en=None,
+        aprobado_por=None,
+        generado_en=None,
+    ):
+        com = Comunicacion(
+            caso_id=caso_id,
+            contenido=contenido,
+            tipo=tipo,
+            estado=estado,
+            aprobado_en=aprobado_en,
+            aprobado_por=aprobado_por,
+        )
+        if generado_en is not None:
+            com.generado_en = generado_en
+        db_session.add(com)
+        db_session.commit()
+        db_session.refresh(com)
+        return com
+
+    return _crear
 
 
 # ── App de test ────────────────────────────────────────────────────────────────

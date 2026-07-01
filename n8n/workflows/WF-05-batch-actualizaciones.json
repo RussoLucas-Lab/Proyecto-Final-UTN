@@ -1,0 +1,387 @@
+{
+  "id": "wf-05-iuris-batch-actualizaciones",
+  "name": "WF-05 — Batch de actualizaciones (15 días)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 7,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "a1a2a3a4-0001-4000-8000-000000000001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "notes": "Diario 07:00. Requiere GENERIC_TIMEZONE=America/Argentina/Buenos_Aires en la instancia de n8n (docker-compose.yml) para que la hora sea local, no UTC."
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1b2b3b4-0002-4000-8000-000000000002",
+              "name": "internal_secret",
+              "type": "string",
+              "value": "={{ $env.N8N_INTERNAL_SECRET }}"
+            },
+            {
+              "id": "b1b2b3b4-0002-4000-8000-000000000003",
+              "name": "backend_url",
+              "type": "string",
+              "value": "={{ $env.BACKEND_URL }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1b2b3b4-0002-4000-8000-000000000004",
+      "name": "Set Internal Secret",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [420, 300],
+      "notes": "Resuelve $env en la cadena principal (única forma soportada): un tool sub-node del AI Agent NO puede leer $env directo (ver skill n8n-workflow / bug real de WF-01). Cualquier nodo, incluidos los tool sub-nodes, puede referenciar este Set vía $('Set Internal Secret').first().json.<campo>."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.backend_url }}/api/v1/internal/casos/pendientes-actualizacion",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Secret",
+              "value": "={{ $json.internal_secret }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c1c2c3c4-0003-4000-8000-000000000005",
+      "name": "GET Pendientes de Actualización",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "d1d2d3d4-0004-4000-8000-000000000006",
+              "leftValue": "={{ $json.casos_pendientes.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d1d2d3d4-0004-4000-8000-000000000007",
+      "name": "¿Hay pendientes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [860, 300],
+      "notes": "Rama false (lista vacía): fin del workflow sin invocar al AI Agent ni persistir nada."
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "casos_pendientes",
+        "destinationFieldName": "caso_id",
+        "options": {}
+      },
+      "id": "e1e2e3e4-0005-4000-8000-000000000008",
+      "name": "Split Out caso_id",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1080, 200],
+      "notes": "Convierte la lista casos_pendientes (un item con un array) en un item por caso_id, para iterar de a uno con Split In Batches."
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "f1f2f3f4-0006-4000-8000-000000000009",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1300, 200],
+      "notes": "Itera un caso_id por vez. Salida 0 = done (fin del loop); salida 1 = loop (procesa este item). El último nodo del loop (POST Persistir Borrador) vuelve a conectar a la entrada de este nodo."
+    },
+    {
+      "parameters": {
+        "agent": "conversationalAgent",
+        "text": "=Generá una actualización para el caso con ID {{ $json.caso_id }}. Usá la herramienta obtener_contexto_caso con {\"caso_id\": {{ $json.caso_id }}} para obtener los datos.",
+        "systemMessage": "Sos un asistente jurídico del Estudio Iuris (Argentina). Tu tarea es redactar una actualización periódica clara y empática para el cliente sobre el avance de su caso (batch cada 15 días).\n\nUSA la herramienta 'obtener_contexto_caso' para obtener el contexto del caso antes de redactar.\n\nREGLAS:\n- Redactá en español rioplatense formal pero accesible.\n- Basate SOLO en los datos devueltos por la herramienta; NO inventes datos, plazos ni montos (RN-23).\n- Si hay novedades, mencionálas brevemente.\n- Si no hay novedades recientes, redactá un mensaje genérico que informe la etapa actual.\n- El mensaje debe ser breve (3-5 oraciones), sin jerga legal innecesaria.\n- NO incluyas instrucciones al abogado ni meta-comentarios.\n- La respuesta debe ser SOLO el texto del mensaje al cliente (sin encabezado JSON ni explicaciones).",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "a2a3a4a5-0007-4000-8000-000000000010",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1,
+      "position": [1520, 100],
+      "notes": "Reutiliza el MISMO agente que WF-01 (D2): mismo modelo, mismo tool obtener_contexto_caso, mismas reglas de redacción."
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {}
+      },
+      "id": "a3a4a5a6-0008-4000-8000-000000000011",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [1420, 320],
+      "credentials": {
+        "openAiApi": {
+          "id": "GDYNG4kGfvEN0YoB",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Set Internal Secret').first().json.backend_url }}/api/v1/internal/casos/{{ $json.caso_id }}/contexto",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Secret",
+              "value": "={{ $('Set Internal Secret').first().json.internal_secret }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "a4a5a6a7-0009-4000-8000-000000000012",
+      "name": "obtener_contexto_caso",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1,
+      "position": [1620, 320],
+      "notes": "Herramienta del AI Agent: obtiene datos seguros del caso (cliente, etapa, últimas novedades). Sin DNI/CUIL ni datos sensibles. El secreto y la URL se leen del nodo 'Set Internal Secret' (main chain), NUNCA de $env directo: un tool sub-node no resuelve $env (ver skill n8n-workflow)."
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a6a7a8a9-0011-4000-8000-000000000014",
+              "name": "caso_id",
+              "type": "number",
+              "value": "={{ $('Split In Batches').item.json.caso_id }}"
+            },
+            {
+              "id": "a6a7a8a9-0011-4000-8000-000000000015",
+              "name": "contenido",
+              "type": "string",
+              "value": "={{ $json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a6a7a8a9-0011-4000-8000-000000000016",
+      "name": "Preparar Persistencia",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1740, 100],
+      "notes": "Reincorpora caso_id (perdido al pasar por el AI Agent, que solo devuelve `output`) junto al texto generado, en un solo item simple para el POST siguiente. Evita depender de resolución pairedItem cruzando el nodo AI Agent en cada expresión posterior."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Set Internal Secret').first().json.backend_url }}/api/v1/internal/casos/{{ $json.caso_id }}/comunicaciones",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Secret",
+              "value": "={{ $('Set Internal Secret').first().json.internal_secret }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contenido: $json.contenido }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "a5a6a7a8-0010-4000-8000-000000000013",
+      "name": "POST Persistir Borrador",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 100],
+      "notes": "Persiste el borrador generado (tipo=ACTUALIZACION_AUTOMATICA, estado=PENDIENTE_REVISION). No envía nada al cliente (RN-19). Idempotente: si el caso ya tiene un automático pendiente, el backend responde 409 y esta rama simplemente continúa el loop sin duplicar (Split In Batches sigue con el próximo item)."
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Internal Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Internal Secret": {
+      "main": [
+        [
+          {
+            "node": "GET Pendientes de Actualización",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Pendientes de Actualización": {
+      "main": [
+        [
+          {
+            "node": "¿Hay pendientes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay pendientes?": {
+      "main": [
+        [
+          {
+            "node": "Split Out caso_id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Split Out caso_id": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Preparar Persistencia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Persistencia": {
+      "main": [
+        [
+          {
+            "node": "POST Persistir Borrador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Persistir Borrador": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "obtener_contexto_caso": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": ""
+  },
+  "pinData": {},
+  "tags": [
+    {
+      "name": "comunicaciones"
+    },
+    {
+      "name": "batch"
+    }
+  ]
+}
