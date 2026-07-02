@@ -4,7 +4,7 @@
  */
 
 import { http } from '../../shared/http';
-import type { Respaldo, TriggerRespaldoResponse } from './types';
+import type { DescargarRespaldoResponse, Respaldo, TriggerRespaldoResponse } from './types';
 
 /**
  * Lista el historial de respaldos ordenado por fecha DESC.
@@ -23,4 +23,13 @@ export function listarRespaldos(): Promise<Respaldo[]> {
  */
 export function triggerRespaldoManual(): Promise<TriggerRespaldoResponse> {
   return http.post<TriggerRespaldoResponse>('/backups');
+}
+
+/**
+ * Obtiene una URL prefirmada para descargar el Excel de un respaldo.
+ * GET /api/v1/backups/{id}/download
+ * Requiere rol SOCIO (cookie JWT).
+ */
+export function descargarRespaldo(id: number): Promise<DescargarRespaldoResponse> {
+  return http.get<DescargarRespaldoResponse>(`/backups/${id}/download`);
 }

@@ -18,3 +18,8 @@ export interface Respaldo {
 export interface TriggerRespaldoResponse {
   mensaje: string;
 }
+
+export interface DescargarRespaldoResponse {
+  download_url: string;
+  expires_in: number;
+}

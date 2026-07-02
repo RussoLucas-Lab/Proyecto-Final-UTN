@@ -197,5 +197,10 @@ async def get_internal_presigned_upload(
     CSRF: exento (prefijo /internal en CSRFMiddleware + método GET).
     """
     object_key = f"backups/{filename}"
-    upload_url = storage.generate_presigned_url("put_object", object_key, expires_in=3600)
+    # internal=True: n8n consumes this URL server-side from inside the Docker
+    # network, so it must be signed against the internal storage endpoint
+    # (minio:9000), not the browser-facing public host (localhost:9000).
+    upload_url = storage.generate_presigned_url(
+        "put_object", object_key, expires_in=3600, internal=True
+    )
     return StoragePresignedUploadResponse(upload_url=upload_url, object_key=object_key)
