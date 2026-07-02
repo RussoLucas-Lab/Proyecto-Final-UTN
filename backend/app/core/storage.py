@@ -48,8 +48,14 @@ class StorageClient:
         operation: Literal["put_object", "get_object"],
         key: str,
         expires_in: int = 3600,
+        internal: bool = False,
     ) -> str:
-        url: str = self._presign_client.generate_presigned_url(
+        # Browser-facing URLs sign against the PUBLIC endpoint (the host the
+        # browser reaches). Server-to-server consumers inside the Docker network
+        # (e.g. n8n WF-02 uploading a backup) must sign against the INTERNAL
+        # endpoint — from a container, the public host (localhost) is unreachable.
+        client = self._client if internal else self._presign_client
+        url: str = client.generate_presigned_url(
             ClientMethod=operation,
             Params={"Bucket": self._bucket, "Key": key},
             ExpiresIn=expires_in,

@@ -3,9 +3,10 @@ Router de la feature 'backups' (RF-21, RF-22, ADR-0003).
 
 Endpoints (bajo el prefijo /api/v1 definido en main.py):
 
-  GET  /backups               → historial de respaldos (200/401/403)
-  POST /backups               → disparar respaldo manual vía n8n WF-02 (202/401/403/503)
-  POST /internal/backups      → registrar resultado de n8n (201/401/422)
+  GET  /backups                    → historial de respaldos (200/401/403)
+  POST /backups                    → disparar respaldo manual vía n8n WF-02 (202/401/403/503)
+  GET  /backups/{id}/download      → URL prefirmada de descarga (200/401/403/404/409)
+  POST /internal/backups           → registrar resultado de n8n (201/401/422)
 
 Seguridad (checklist seguridad-endpoint):
 
@@ -37,14 +38,19 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db, require_roles
 from app.core.rate_limit import limiter
+from app.core.storage import StorageClient, get_storage_client
 from app.features.auth.models import Usuario
 from app.features.backups.schemas import (
+    BackupDownloadResponse,
     BackupRegistrarRequest,
     BackupResponse,
     BackupTriggerResponse,
 )
 from app.features.backups.service import (
     BackupN8nNoDisponible,
+    BackupNoDescargable,
+    BackupNoEncontrado,
+    get_backup_download_url,
     listar_backups,
     registrar_backup,
     trigger_backup_manual,
@@ -127,6 +133,48 @@ async def post_backups(
     return BackupTriggerResponse(
         mensaje="Respaldo manual iniciado. El resultado quedará registrado en el historial."
     )
+
+
+# ── GET /backups/{backup_id}/download ────────────────────────────────────────────
+
+
+@router.get(
+    "/backups/{backup_id}/download",
+    response_model=BackupDownloadResponse,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("100/minute")
+async def get_backup_download(
+    request: Request,
+    backup_id: int,
+    db: Session = Depends(get_db),
+    _current_user: Usuario = Depends(_require_socio),
+    storage: StorageClient = Depends(get_storage_client),
+) -> BackupDownloadResponse:
+    """URL prefirmada de descarga del Excel de un respaldo (RF-22).
+
+    Solo SOCIO: el historial de respaldos es información operacional sensible (D6).
+    La URL se firma contra el endpoint público (la consume el navegador).
+
+    - 200: BackupDownloadResponse { download_url, expires_in }
+    - 401: sin sesión activa
+    - 403: sin rol SOCIO
+    - 404: respaldo no encontrado
+    - 409: respaldo sin archivo descargable (falló o sin ubicación)
+
+    Auth: cookie JWT (require_roles(SOCIO)). CSRF: no aplica (GET).
+    """
+    try:
+        return get_backup_download_url(db, backup_id, storage)
+    except BackupNoEncontrado:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Respaldo no encontrado"
+        )
+    except BackupNoDescargable:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El respaldo no tiene un archivo disponible para descargar",
+        )
 
 
 # ── POST /internal/backups ─────────────────────────────────────────────────────

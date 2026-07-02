@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { triggerRespaldoManual } from './api';
+import { descargarRespaldo, triggerRespaldoManual } from './api';
 import { useRespaldos } from './hooks/useRespaldos';
 import type { EstadoRespaldo, TipoRespaldo } from './types';
 
@@ -17,14 +17,25 @@ const ESTADO_LABEL: Record<EstadoRespaldo, string> = {
 
 // ── Helpers de fecha ─────────────────────────────────────────────────────────
 
+// El estudio opera en Argentina: mostramos siempre en su zona horaria,
+// sin depender de la zona del navegador de quien mira.
+const TZ_AR = 'America/Argentina/Buenos_Aires';
+
 function formatFecha(isoString: string): string {
   const d = new Date(isoString);
-  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return d.toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: TZ_AR,
+  });
 }
 
 function formatHora(isoString: string): string {
   const d = new Date(isoString);
-  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+  return (
+    d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ_AR }) + ' hs'
+  );
 }
 
 // ── Íconos ────────────────────────────────────────────────────────────────────
@@ -95,8 +106,25 @@ export default function RespaldosPage() {
   const [triggering, setTriggering] = useState(false);
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
   const [triggerError, setTriggerError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const ultimoOk = respaldos.find(r => r.estado === 'OK');
+
+  async function handleDescargar(id: number) {
+    setDownloadingId(id);
+    setDownloadError(null);
+    try {
+      const { download_url } = await descargarRespaldo(id);
+      // La URL prefirmada apunta al storage (otro origen). Abrir en una pestaña
+      // nueva dispara la descarga del Excel sin navegar fuera de la app.
+      window.open(download_url, '_blank', 'noopener');
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'No se pudo descargar el respaldo');
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   async function handleRespaldoManual() {
     setTriggering(true);
@@ -163,6 +191,20 @@ export default function RespaldosPage() {
           fontFamily: 'Inter, sans-serif',
         }}>
           {triggerError}
+        </div>
+      )}
+      {downloadError && (
+        <div style={{
+          marginTop: 12,
+          background: '#FEE4E2',
+          border: '1px solid #F5C2C0',
+          borderRadius: 8,
+          padding: '10px 16px',
+          fontSize: 13,
+          color: '#C9423A',
+          fontFamily: 'Inter, sans-serif',
+        }}>
+          {downloadError}
         </div>
       )}
 
@@ -322,9 +364,13 @@ export default function RespaldosPage() {
                 {/* Acciones */}
                 <div style={{ padding: '12px 16px' }}>
                   {b.estado === 'OK' && b.ubicacion ? (
-                    <button style={btnSecondary}>
+                    <button
+                      style={{ ...btnSecondary, opacity: downloadingId === b.id ? 0.6 : 1 }}
+                      onClick={() => handleDescargar(b.id)}
+                      disabled={downloadingId === b.id}
+                    >
                       <IconDownload />
-                      Descargar
+                      {downloadingId === b.id ? 'Descargando…' : 'Descargar'}
                     </button>
                   ) : (
                     <button style={{

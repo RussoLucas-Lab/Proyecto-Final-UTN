@@ -21,10 +21,17 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.storage import StorageClient
 from app.features.backups.models import Backup
-from app.features.backups.schemas import BackupRegistrarRequest
+from app.features.backups.schemas import BackupDownloadResponse, BackupRegistrarRequest
+from app.shared.enums import EstadoBackup
 
 logger = logging.getLogger("iuris.backups")
+
+# Prefijo del object key en storage donde WF-02 sube los Excel de respaldo.
+# WF-02 sube a `backups/<archivo>` y registra en `ubicacion` solo `<archivo>`.
+_BACKUP_PREFIX = "backups/"
+_EXPIRES_DOWNLOAD = 3600
 
 
 # ── Excepciones del dominio ───────────────────────────────────────────────────
@@ -32,6 +39,14 @@ logger = logging.getLogger("iuris.backups")
 
 class BackupN8nNoDisponible(Exception):
     """El webhook de n8n no respondió o devolvió un error al disparar WF-02."""
+
+
+class BackupNoEncontrado(Exception):
+    """No existe un backup con ese id."""
+
+
+class BackupNoDescargable(Exception):
+    """El backup existe pero no tiene archivo asociado (estado ERROR o sin ubicación)."""
 
 
 # ── Funciones de servicio ─────────────────────────────────────────────────────
@@ -68,6 +83,31 @@ def listar_backups(db: Session) -> list[Backup]:
         select(Backup).order_by(Backup.fecha.desc())
     ).scalars().all()
     return list(filas)
+
+
+def get_backup_download_url(
+    db: Session, backup_id: int, storage: StorageClient
+) -> BackupDownloadResponse:
+    """Genera una URL prefirmada de descarga (GET S3) para el Excel de un backup.
+
+    La URL se firma contra el endpoint PÚBLICO (internal=False, default): la
+    consume el navegador del SOCIO, no un servicio interno.
+
+    - Lanza BackupNoEncontrado si el id no existe.
+    - Lanza BackupNoDescargable si el backup falló (estado ERROR) o no tiene
+      ubicación: no hay archivo que descargar.
+    """
+    backup = db.get(Backup, backup_id)
+    if backup is None:
+        raise BackupNoEncontrado(f"Backup {backup_id} no encontrado")
+    if backup.estado != EstadoBackup.OK or not backup.ubicacion:
+        raise BackupNoDescargable(f"Backup {backup_id} sin archivo descargable")
+
+    object_key = f"{_BACKUP_PREFIX}{backup.ubicacion}"
+    download_url = storage.generate_presigned_url(
+        "get_object", object_key, _EXPIRES_DOWNLOAD
+    )
+    return BackupDownloadResponse(download_url=download_url, expires_in=_EXPIRES_DOWNLOAD)
 
 
 def trigger_backup_manual(webhook_url: str, internal_secret: str) -> None:
