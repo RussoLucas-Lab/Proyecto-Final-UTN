@@ -92,21 +92,12 @@ export default function ClientesPage() {
             {clientes.length} resultado{clientes.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setModal({ tipo: 'alta' })}
-            style={{ background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}
-          >
-            + Ingresar cliente
-          </button>
-          <button
-            onClick={() => navigate('/clientes/nuevo')}
-            style={{ background: '#F2F0EA', color: '#1B3A6B', border: '1.5px solid #1B3A6B', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}
-            title="Formulario completo de admisión"
-          >
-            Admisión completa
-          </button>
-        </div>
+        <button
+          onClick={() => navigate('/clientes/nuevo')}
+          style={{ background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}
+        >
+          + Ingresar cliente
+        </button>
       </div>
 
       {/* Error */}

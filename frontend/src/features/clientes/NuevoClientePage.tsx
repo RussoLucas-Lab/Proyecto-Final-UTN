@@ -107,7 +107,11 @@ export default function NuevoClientePage() {
   const col2Grid: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 };
   const fieldGap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 14 };
 
-  async function handleGuardar() {
+  /**
+   * Guarda el cliente. Si `crearCaso` es true, redirige a la creación de caso
+   * con el cliente recién creado ya preseleccionado; si no, vuelve al listado.
+   */
+  async function handleGuardar(crearCaso: boolean) {
     const nombreCompleto = [apellido.trim(), nombre.trim()].filter(Boolean).join(', ');
     if (!nombreCompleto) { setError('El nombre y apellido son obligatorios.'); return; }
     if (!dni.trim()) { setError('El DNI es obligatorio.'); return; }
@@ -128,8 +132,12 @@ export default function NuevoClientePage() {
     setSaving(true);
     setError(null);
     try {
-      await api.crear(datos);
-      navigate('/clientes');
+      const nuevo = await api.crear(datos);
+      if (crearCaso) {
+        navigate('/casos/nuevo', { state: { cliente: nuevo } });
+      } else {
+        navigate('/clientes');
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('409')) {
@@ -238,7 +246,7 @@ export default function NuevoClientePage() {
               Los datos se guardarán de forma segura conforme a la Ley 25.326.
             </p>
             <button
-              onClick={() => void handleGuardar()}
+              onClick={() => void handleGuardar(false)}
               disabled={saving}
               style={{
                 width: '100%', height: 44, background: saving ? '#7B8799' : '#1B3A6B', color: '#fff',
@@ -247,6 +255,17 @@ export default function NuevoClientePage() {
               }}
             >
               {saving ? 'Guardando…' : 'Guardar cliente'}
+            </button>
+            <button
+              onClick={() => void handleGuardar(true)}
+              disabled={saving}
+              style={{
+                width: '100%', height: 44, background: '#FFFFFF', color: '#1B3A6B',
+                border: '1.5px solid #1B3A6B', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif", marginTop: 8,
+              }}
+            >
+              Guardar cliente y crear caso
             </button>
             <button
               onClick={() => navigate('/clientes')}

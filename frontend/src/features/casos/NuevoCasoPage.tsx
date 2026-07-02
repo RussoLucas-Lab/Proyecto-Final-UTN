@@ -4,15 +4,31 @@
  * El area se elige en pantalla (no hardcodeada). Si es ART, pide tipo_reclamo.
  * La búsqueda de cliente es local/mock hasta que exista el autocomplete de clientes.
  * Al crear, llama a api.crear() y redirige a la página de detalle según el área.
+ *
+ * Los "Datos del trabajo" y "Notas internas" pertenecen a la ficha laboral del
+ * caso (RF-09, 1:1 con caso), no al cliente. Viajan anidados en ficha_laboral;
+ * solo se envía el objeto si al menos un campo fue completado (evita fichas vacías).
  */
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import * as casosApi from './api';
-import type { AreaDerecho, TipoReclamoArt } from './types';
+import type { AreaDerecho, FichaLaboralUpsert, TipoReclamoArt } from './types';
 import { listar as listarClientes } from '../clientes/api';
 import type { Cliente } from '../clientes/types';
 import { listar as listarUsuarios } from '../usuarios/api';
 import type { Usuario } from '../usuarios/types';
+
+/**
+ * Normaliza la remuneración declarada a un string numérico para el backend
+ * (ficha_laboral.remuneracion es Decimal). Acepta "$", puntos y comas;
+ * devuelve null si el campo está vacío o no es un número válido.
+ */
+function parseRemuneracion(raw: string): string | null {
+  const cleaned = raw.replace(/[^0-9.,]/g, '').replace(/\./g, '').replace(',', '.');
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? String(n) : null;
+}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -50,9 +66,16 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 export default function NuevoCasoPage() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
+  const location = useLocation();
+  // Cliente precargado al venir desde "Guardar cliente y crear caso" (NuevoClientePage).
+  const clientePreseleccionado =
+    (location.state as { cliente?: Cliente } | null)?.cliente ?? null;
+
+  const [searchQuery, setSearchQuery] = useState(clientePreseleccionado?.nombre ?? '');
   const [showResults, setShowResults] = useState(false);
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(
+    clientePreseleccionado,
+  );
   const [resultados, setResultados] = useState<Cliente[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [area, setArea] = useState<AreaDerecho | null>(null);
@@ -61,6 +84,21 @@ export default function NuevoCasoPage() {
   const [abogados, setAbogados] = useState<Usuario[]>([]);
   const [expediente, setExpediente] = useState('');
   const [observaciones, setObservaciones] = useState('');
+
+  // Ficha laboral — datos del trabajo (RF-09). Opcional, viaja anidada en ficha_laboral.
+  // Estos datos del empleador prellenan el "Destinatario" del telegrama (Ley 23.789).
+  const [razonSocial, setRazonSocial] = useState('');
+  const [ramoActividad, setRamoActividad] = useState('');
+  const [direccionTrabajo, setDireccionTrabajo] = useState('');
+  const [direccionTrabajoCp, setDireccionTrabajoCp] = useState('');
+  const [direccionTrabajoLocalidad, setDireccionTrabajoLocalidad] = useState('');
+  const [direccionTrabajoProvincia, setDireccionTrabajoProvincia] = useState('');
+  const [fechaInicioLaboral, setFechaInicioLaboral] = useState('');
+  const [motivoCese, setMotivoCese] = useState('');
+  const [jornada, setJornada] = useState('');
+  const [tareas, setTareas] = useState('');
+  const [remuneracion, setRemuneracion] = useState('');
+  const [cctAplicable, setCctAplicable] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +132,31 @@ export default function NuevoCasoPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Estilos compartidos por los campos de la ficha laboral (mismo look que el resto de la page).
+  const fichaLabelStyle: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#7B8799',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    display: 'block',
+    marginBottom: 6,
+    fontFamily: 'Inter, sans-serif',
+  };
+  const fichaInputStyle: React.CSSProperties = {
+    width: '100%',
+    height: 40,
+    border: '1.5px solid #E5E2D8',
+    borderRadius: 8,
+    background: '#FAFAF7',
+    padding: '0 12px',
+    fontSize: 13,
+    color: '#131C2E',
+    fontFamily: 'Inter, sans-serif',
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
+
   const abogadoLabel = abogados.find((a) => a.id === abogadoId)?.nombre ?? '—';
   const canCreate =
     clienteSeleccionado !== null &&
@@ -106,6 +169,23 @@ export default function NuevoCasoPage() {
     setLoading(true);
     setError(null);
     try {
+      // Ficha laboral: solo se envía si al menos un campo fue completado (evita fichas vacías).
+      const ficha: FichaLaboralUpsert = {
+        razon_social: razonSocial.trim() || null,
+        ramo_actividad: ramoActividad.trim() || null,
+        direccion_trabajo: direccionTrabajo.trim() || null,
+        direccion_trabajo_cp: direccionTrabajoCp.trim() || null,
+        direccion_trabajo_localidad: direccionTrabajoLocalidad.trim() || null,
+        direccion_trabajo_provincia: direccionTrabajoProvincia.trim() || null,
+        fecha_inicio_laboral: fechaInicioLaboral || null,
+        motivo_cese: motivoCese.trim() || null,
+        jornada: jornada.trim() || null,
+        tareas: tareas.trim() || null,
+        remuneracion: parseRemuneracion(remuneracion),
+        cct_aplicable: cctAplicable.trim() || null,
+      };
+      const tieneFicha = Object.values(ficha).some((v) => v !== null && v !== '');
+
       const nuevo = await casosApi.crear({
         cliente_id: clienteSeleccionado.id,
         abogado_responsable_id: abogadoId,
@@ -113,6 +193,7 @@ export default function NuevoCasoPage() {
         tipo_reclamo: area === 'ART' ? tipoReclamo : null,
         codigo_expediente: expediente.trim() || null,
         observaciones: observaciones.trim() || null,
+        ficha_laboral: tieneFicha ? ficha : null,
       });
       const ruta = area === 'LABORAL' ? `/casos/${nuevo.id}/laboral` : `/casos/${nuevo.id}/art`;
       navigate(ruta);
@@ -363,9 +444,136 @@ export default function NuevoCasoPage() {
             </select>
           </Card>
 
-          {/* Card D: Datos adicionales (opcionales) */}
+          {/* Card D: Datos del trabajo (ficha laboral, RF-09 — opcional) */}
           <Card>
-            <SectionLabel>4. Datos adicionales (opcional)</SectionLabel>
+            <SectionLabel>4. Datos del trabajo (opcional)</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={fichaLabelStyle}>Razón social del empleador</label>
+                <input
+                  type="text"
+                  value={razonSocial}
+                  onChange={(e) => setRazonSocial(e.target.value)}
+                  placeholder="Distribuidora del Centro S.A."
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>Ramo o actividad</label>
+                <input
+                  type="text"
+                  value={ramoActividad}
+                  onChange={(e) => setRamoActividad(e.target.value)}
+                  placeholder="Comercio / Distribución"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={fichaLabelStyle}>Dirección del trabajo</label>
+                <input
+                  type="text"
+                  value={direccionTrabajo}
+                  onChange={(e) => setDireccionTrabajo(e.target.value)}
+                  placeholder="Av. San Martín 1520"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>CP</label>
+                <input
+                  type="text"
+                  value={direccionTrabajoCp}
+                  onChange={(e) => setDireccionTrabajoCp(e.target.value)}
+                  placeholder="5500"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>Localidad</label>
+                <input
+                  type="text"
+                  value={direccionTrabajoLocalidad}
+                  onChange={(e) => setDireccionTrabajoLocalidad(e.target.value)}
+                  placeholder="Mendoza"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>Provincia</label>
+                <input
+                  type="text"
+                  value={direccionTrabajoProvincia}
+                  onChange={(e) => setDireccionTrabajoProvincia(e.target.value)}
+                  placeholder="Mendoza"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>Fecha de inicio de la relación</label>
+                <input
+                  type="date"
+                  value={fechaInicioLaboral}
+                  onChange={(e) => setFechaInicioLaboral(e.target.value)}
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>Motivo del cese (si aplica)</label>
+                <input
+                  type="text"
+                  value={motivoCese}
+                  onChange={(e) => setMotivoCese(e.target.value)}
+                  placeholder="Despido sin causa"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>Jornada laboral</label>
+                <input
+                  type="text"
+                  value={jornada}
+                  onChange={(e) => setJornada(e.target.value)}
+                  placeholder="8 hs diarias / 48 hs semanales"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>Tareas desempeñadas</label>
+                <input
+                  type="text"
+                  value={tareas}
+                  onChange={(e) => setTareas(e.target.value)}
+                  placeholder="Administrativo"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>Remuneración declarada</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={remuneracion}
+                  onChange={(e) => setRemuneracion(e.target.value)}
+                  placeholder="Ej: 850000"
+                  style={fichaInputStyle}
+                />
+              </div>
+              <div>
+                <label style={fichaLabelStyle}>CCT aplicable</label>
+                <input
+                  type="text"
+                  value={cctAplicable}
+                  onChange={(e) => setCctAplicable(e.target.value)}
+                  placeholder="CCT 130/75"
+                  style={fichaInputStyle}
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Card E: Datos adicionales (opcionales) */}
+          <Card>
+            <SectionLabel>5. Datos adicionales (opcional)</SectionLabel>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#7B8799', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
