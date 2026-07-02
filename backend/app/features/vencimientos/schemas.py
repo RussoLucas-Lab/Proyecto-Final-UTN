@@ -35,3 +35,4 @@ class VencimientoAgendaResponse(BaseModel):
     creado_por: int | None
     creado_en: datetime
     area_caso: str  # "LABORAL" | "ART"
+    cliente_nombre: str

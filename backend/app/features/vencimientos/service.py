@@ -3,6 +3,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.features.casos.models import Caso
+from app.features.clientes.models import Cliente
 from app.features.vencimientos.models import Vencimiento
 from app.features.vencimientos.schemas import VencimientoCreate
 
@@ -53,8 +54,9 @@ def listar_vencimientos_rango(
     desde: date, hasta: date, db: Session
 ) -> list[dict]:
     rows = (
-        db.query(Vencimiento, Caso.area)
+        db.query(Vencimiento, Caso.area, Cliente.nombre)
         .join(Caso, Vencimiento.caso_id == Caso.id)
+        .join(Cliente, Caso.cliente_id == Cliente.id)
         .filter(Vencimiento.fecha >= desde, Vencimiento.fecha <= hasta)
         .order_by(Vencimiento.fecha.asc())
         .all()
@@ -69,8 +71,9 @@ def listar_vencimientos_rango(
             "creado_por": v.creado_por,
             "creado_en": v.creado_en,
             "area_caso": area.value,
+            "cliente_nombre": cliente_nombre,
         }
-        for v, area in rows
+        for v, area, cliente_nombre in rows
     ]
 
 

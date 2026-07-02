@@ -89,7 +89,12 @@ class TestListarVencimientosCaso:
 
 
 class TestListarVencimientosRango:
-    def _make_row(self, descripcion="Presentar demanda", area_value="LABORAL"):
+    def _make_row(
+        self,
+        descripcion="Presentar demanda",
+        area_value="LABORAL",
+        cliente_nombre="Juan Pérez",
+    ):
         from datetime import datetime
         v = MagicMock()
         v.id = 1
@@ -101,11 +106,11 @@ class TestListarVencimientosRango:
         v.creado_en = datetime(2026, 7, 1)
         area = MagicMock()
         area.value = area_value
-        return (v, area)
+        return (v, area, cliente_nombre)
 
     def _db_with_rows(self, rows):
         db = MagicMock()
-        db.query.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = rows
+        db.query.return_value.join.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = rows
         return db
 
     def test_retorna_vencimientos_en_rango(self):
@@ -117,6 +122,7 @@ class TestListarVencimientosRango:
         assert len(result) == 1
         assert result[0]["descripcion"] == "Presentar demanda"
         assert result[0]["area_caso"] == "LABORAL"
+        assert result[0]["cliente_nombre"] == "Juan Pérez"
 
     def test_retorna_lista_vacia_fuera_de_rango(self):
         db = self._db_with_rows([])

@@ -15,4 +15,5 @@ export interface VencimientoResponse {
 
 export interface VencimientoAgendaItem extends VencimientoResponse {
   area_caso: string; // "LABORAL" | "ART"
+  cliente_nombre: string;
 }

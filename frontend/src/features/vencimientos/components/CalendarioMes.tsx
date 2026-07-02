@@ -155,6 +155,7 @@ export function CalendarioMes({
                 borderRight: '1px solid #F2F0EA',
                 borderBottom: '1px solid #F2F0EA',
                 minHeight: 76,
+                minWidth: 0,
                 background: cellBg,
                 cursor: items.length > 0 ? 'pointer' : 'default',
                 transition: 'background .1s',

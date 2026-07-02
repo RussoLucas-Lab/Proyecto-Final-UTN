@@ -124,6 +124,7 @@ export default function AgendaPage() {
             borderRadius: 12,
             border: '1px solid #E5E2D8',
             overflow: 'hidden',
+            minWidth: 0,
           }}>
             <CalendarioMes
               año={año}
@@ -194,6 +195,17 @@ export default function AgendaPage() {
                         <span style={areaBadgeStyle(v.area_caso)}>
                           {isArt ? 'ART' : 'Laboral'}
                         </span>
+                        <span style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: '#131C2E',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          minWidth: 0,
+                        }}>
+                          {v.cliente_nombre}
+                        </span>
                         {v.completado && (
                           <span style={{
                             fontSize: 10,
@@ -213,6 +225,8 @@ export default function AgendaPage() {
                         color: v.completado ? '#8B95A5' : '#131C2E',
                         lineHeight: 1.4,
                         textDecoration: v.completado ? 'line-through' : 'none',
+                        overflowWrap: 'break-word',
+                        wordBreak: 'break-word',
                       }}>
                         {v.descripcion}
                       </div>
